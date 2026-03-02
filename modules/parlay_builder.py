@@ -1,6 +1,6 @@
+# modules/parlay_builder.py
 import streamlit as st
 from itertools import combinations
-from .betting_tracker import BettingTracker
 
 def build_parlay(picks):
     """Construye un parlay a partir de picks"""
@@ -13,7 +13,7 @@ def build_parlay(picks):
         total_prob *= p['prob']
         matches_list.append(f"{p['match']}: {p['selection']}")
     
-    # Cuota estimada (inversa de probabilidad con margen)
+    # Cuota estimada (inversa de probabilidad con margen 5%)
     total_odds = 1.0
     for p in picks:
         total_odds *= (1 / p['prob']) * 0.95
@@ -28,14 +28,14 @@ def build_parlay(picks):
         'ev': round(ev, 4)
     }
 
-def show_parlay_options(all_picks):
+def show_parlay_options(all_picks, tracker):
     """Muestra interfaz de parlays con opción de registrar"""
     st.divider()
     st.subheader("🎯 Parlays Recomendados")
     
-    # Inicializar tracker
-    if 'tracker' not in st.session_state:
-        st.session_state.tracker = BettingTracker()
+    if len(all_picks) < 2:
+        st.info("Se necesitan al menos 2 selecciones para generar parlays")
+        return
     
     # Mostrar picks disponibles
     st.markdown("**Selecciones disponibles:**")
@@ -45,35 +45,42 @@ def show_parlay_options(all_picks):
             with st.container(border=True):
                 st.markdown(f"**{pick['match']}**")
                 st.markdown(f"📌 {pick['selection']}")
-                st.metric("Probabilidad", f"{pick['prob']:.1%}")
+                st.metric("Prob", f"{pick['prob']:.1%}")
     
+    # Botón para generar combinaciones
     if st.button("🔄 Generar combinaciones"):
         parlays = []
-        for combo in combinations(all_picks, 2):
-            parlay = build_parlay(list(combo))
-            if parlay and parlay['ev'] > 0:
-                parlays.append(parlay)
+        
+        # Generar parlays de 2 y 3 selecciones
+        for size in [2, 3]:
+            for combo in combinations(all_picks, size):
+                parlay = build_parlay(list(combo))
+                if parlay and parlay['ev'] > 0.05:  # EV mínimo 5%
+                    parlays.append(parlay)
+        
+        # Ordenar por EV
+        parlays.sort(key=lambda x: x['ev'], reverse=True)
         
         if parlays:
             st.markdown("**Top parlays encontrados:**")
             for i, p in enumerate(parlays[:5]):
                 with st.container(border=True):
-                    col1, col2, col3 = st.columns([2, 1, 1])
+                    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
                     with col1:
                         st.markdown(f"**Parlay #{i+1}**")
                         for m in p['matches']:
-                            st.markdown(f"• {m}")
+                            st.caption(f"• {m[:50]}...")
                     with col2:
                         st.metric("Cuota", p['total_odds'])
-                        st.metric("Prob", f"{p['total_prob']:.1%}")
                     with col3:
-                        st.metric("EV", f"{p['ev']:.2%}")
-                        if st.button(f"📝 Registrar", key=f"reg_{i}"):
-                            bet = st.session_state.tracker.add_bet(p, stake=100)
+                        st.metric("Prob", f"{p['total_prob']:.1%}")
+                    with col4:
+                        ev_color = "normal" if p['ev'] > 0 else "off"
+                        st.metric("EV", f"{p['ev']:.2%}", delta_color=ev_color)
+                        
+                        if st.button(f"📝 Registrar #{i+1}", key=f"reg_{i}"):
+                            bet = tracker.add_bet(p, stake=100)
                             st.success(f"✅ Apuesta #{bet['id']} registrada!")
                             st.rerun()
         else:
             st.info("No se encontraron parlays con EV positivo")
-    
-    # Mostrar tracker en sidebar
-    st.session_state.tracker.show_tracker_ui()
