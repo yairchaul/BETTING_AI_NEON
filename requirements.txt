@@ -1,6 +1,7 @@
-streamlit==1.31.0
-pandas==2.2.0
-numpy==1.26.0
-requests==2.31.0
-Pillow==10.1.0
-pytesseract==0.3.10
+# Versiones compatibles con Python 3.13
+streamlit==1.41.1
+pandas==2.2.3
+numpy==2.2.4
+requests==2.32.3
+Pillow==11.1.0
+pytesseract==0.3.13
