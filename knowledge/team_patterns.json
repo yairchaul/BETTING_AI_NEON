@@ -1,0 +1,49 @@
+{
+  "PSG": {
+    "casa": {"goles": 2.8, "recibe": 0.9, "btts": 45, "victorias": 85},
+    "visitante": {"goles": 2.2, "recibe": 1.1, "btts": 55, "victorias": 70},
+    "vs_top": {"btts": 70, "victorias": 60},
+    "vs_medios": {"btts": 55, "victorias": 80},
+    "vs_debiles": {"btts": 40, "victorias": 95},
+    "patron": "Golea en casa, a veces recibe goles de equipos buenos"
+  },
+  "Monaco": {
+    "casa": {"goles": 1.9, "recibe": 1.2, "btts": 58, "victorias": 60},
+    "visitante": {"goles": 1.4, "recibe": 1.6, "btts": 65, "victorias": 40},
+    "vs_top": {"anota": 75, "pierde": 70},
+    "vs_medios": {"anota": 60, "victorias": 50},
+    "patron": "Siempre anota contra grandes, pero pierde"
+  },
+  "Lens": {
+    "casa": {"goles": 2.2, "recibe": 0.8, "btts": 40, "victorias": 80},
+    "visitante": {"goles": 1.1, "recibe": 1.5, "btts": 52, "victorias": 35},
+    "vs_debiles": {"goleadas": 70, "clean_sheets": 60},
+    "patron": "Fortísimo en casa, aplasta a débiles"
+  },
+  "Marseille": {
+    "casa": {"goles": 2.0, "recibe": 1.0, "btts": 48, "victorias": 70},
+    "visitante": {"goles": 1.5, "recibe": 1.3, "btts": 55, "victorias": 55},
+    "vs_medios": {"victorias": 65},
+    "patron": "Buen visitante, aprovecha equipos sin motivación"
+  },
+  "Real Madrid": {
+    "casa": {"goles": 2.5, "recibe": 0.8, "btts": 42, "victorias": 88},
+    "visitante": {"goles": 2.0, "recibe": 1.1, "btts": 52, "victorias": 72},
+    "patron": "Gana siempre, a veces recibe gol de equipos menores"
+  },
+  "Barcelona": {
+    "casa": {"goles": 2.4, "recibe": 0.9, "btts": 45, "victorias": 82},
+    "visitante": {"goles": 1.8, "recibe": 1.3, "btts": 58, "victorias": 60},
+    "patron": "Menos dominante que antes, recibe más goles"
+  },
+  "Bayern Munich": {
+    "casa": {"goles": 3.0, "recibe": 0.7, "btts": 38, "victorias": 92},
+    "visitante": {"goles": 2.5, "recibe": 1.0, "btts": 48, "victorias": 80},
+    "patron": "Goleador implacable, pocos reciben"
+  },
+  "Manchester City": {
+    "casa": {"goles": 2.7, "recibe": 0.6, "btts": 35, "victorias": 90},
+    "visitante": {"goles": 2.3, "recibe": 0.9, "btts": 45, "victorias": 78},
+    "patron": "Dominio total, rara vez recibe gol en casa"
+  }
+}
