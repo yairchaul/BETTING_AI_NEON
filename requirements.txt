@@ -1,7 +1,12 @@
-streamlit==1.28.1
-pandas==2.0.3
-numpy==1.24.3
+# Core - Versiones compatibles con Python 3.13
+streamlit==1.31.0
+pandas==2.2.0
+numpy==1.26.0
 requests==2.31.0
-Pillow==10.0.1
-opencv-python-headless==4.8.1.78
+Pillow==10.1.0
+
+# OCR - Solo lo necesario
 pytesseract==0.3.10
+
+# Utilidades
+python-dotenv==1.0.0
