@@ -9,7 +9,7 @@ class GroqVisionParser:
     def __init__(self):
         """Inicializa el cliente de Groq"""
         self.client = Groq(api_key=st.secrets.get("GROQ_API_KEY", ""))
-        self.model = "llama-3.2-90b-vision-preview"  # El más preciso
+        self.model = "llama-3.2-90b-vision-preview"
     
     def encode_image(self, image_bytes):
         """Convierte la imagen a base64"""
@@ -22,7 +22,6 @@ class GroqVisionParser:
         try:
             base64_image = self.encode_image(image_bytes)
             
-            # Prompt diseñado específicamente para tu formato de tabla
             prompt = """
             Esta imagen contiene una tabla de apuestas de fútbol con 5 partidos.
             La tabla tiene 6 columnas:
@@ -42,15 +41,10 @@ class GroqVisionParser:
                 "cuota_empate": "valor con signo",
                 "visitante": "nombre del equipo visitante",
                 "cuota_visitante": "valor con signo"
-              },
-              ... (5 partidos en total)
+              }
             ]
 
-            Asegúrate de:
-            - Incluir SOLO los 5 partidos principales
-            - Usar los nombres completos de los equipos
-            - Mantener los signos (+ o -) en las cuotas
-            - No incluir texto adicional fuera del JSON
+            Asegúrate de incluir SOLO los 5 partidos principales.
             """
             
             response = self.client.chat.completions.create(
@@ -69,21 +63,14 @@ class GroqVisionParser:
                         ]
                     }
                 ],
-                temperature=0.1,  # Bajo para consistencia
-                max_tokens=1000,
-                response_format={"type": "json_object"}  # Forzar JSON
+                temperature=0.1,
+                max_tokens=1000
             )
             
-            # Extraer el JSON de la respuesta
             content = response.choices[0].message.content
-            
-            # Limpiar la respuesta (a veces viene con markdown)
             content = re.sub(r'```json\s*|\s*```', '', content)
-            
-            # Parsear JSON
             matches = json.loads(content)
             
-            # Convertir al formato que espera tu app
             formatted_matches = []
             for m in matches:
                 formatted_matches.append({
@@ -100,54 +87,4 @@ class GroqVisionParser:
             
         except Exception as e:
             st.error(f"Error en Groq Vision: {e}")
-            return []
-    
-    def extract_matches_fallback(self, image_bytes):
-        """
-        Versión simplificada si la anterior falla
-        """
-        try:
-            base64_image = self.encode_image(image_bytes)
-            
-            prompt = """
-            Esta imagen contiene una tabla de fútbol. Dime SOLO los nombres de los equipos locales y visitantes en orden.
-            Formato de respuesta: JSON con array de objetos {local: "", visitante: ""}
-            """
-            
-            response = self.client.chat.completions.create(
-                model="llama-3.2-11b-vision-preview",  # Modelo más rápido
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                temperature=0.1,
-                max_tokens=500
-            )
-            
-            content = response.choices[0].message.content
-            content = re.sub(r'```json\s*|\s*```', '', content)
-            matches = json.loads(content)
-            
-            formatted_matches = []
-            for m in matches:
-                formatted_matches.append({
-                    "home": m["local"],
-                    "away": m["visitante"],
-                    "all_odds": ["N/A", "N/A", "N/A"]
-                })
-            
-            return formatted_matches
-            
-        except Exception as e:
-            st.error(f"Error en fallback: {e}")
             return []
