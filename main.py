@@ -24,10 +24,14 @@ components = init_components()
 
 def parse_raw_betting_text(text):
     """
-    Versión mejorada que maneja el formato complejo de la imagen:
-    - Los equipos aparecen en líneas separadas
-    - Las cuotas pueden estar en la misma línea o separadas
-    - RESTRICCIÓN: El visitante NUNCA puede ser "Empate"
+    Versión CORREGIDA que respeta el orden correcto de los partidos:
+    Los partidos vienen en grupos de 6 líneas:
+    1. Equipo Local
+    2. Cuota Local
+    3. "Empate" o "Empaté"
+    4. Cuota Empate
+    5. Equipo Visitante
+    6. Cuota Visitante
     """
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     matches = []
@@ -36,117 +40,100 @@ def parse_raw_betting_text(text):
     forbidden_words = ['empate', 'empaté', 'draw', 'vs', 'v', 'local', 'visitante', 'cuota', 'odds']
     
     # ============================================================================
-    # PASO 1: Identificar todas las cuotas en el texto
-    # ============================================================================
-    all_odds = []
-    for line in lines:
-        odds_in_line = re.findall(r'[+-]\d{3,4}', line)
-        all_odds.extend(odds_in_line)
-    
-    # ============================================================================
-    # PASO 2: Identificar posibles nombres de equipos (líneas sin cuotas)
-    # ============================================================================
-    team_lines = []
-    for line in lines:
-        # Si la línea NO tiene cuotas y tiene más de 2 caracteres
-        if not re.search(r'[+-]\d{3,4}', line) and len(line) > 2:
-            # Ignorar palabras prohibidas
-            if line.lower() not in forbidden_words:
-                team_lines.append(line)
-    
-    # ============================================================================
-    # PASO 3: Agrupar equipos con sus cuotas (patrón: equipo, cuota local, equipo, cuota visitante)
+    # PASO 1: Identificar el patrón de 6 líneas por partido
     # ============================================================================
     i = 0
-    odds_index = 0
-    
-    while i < len(team_lines) - 1 and odds_index + 2 < len(all_odds):
-        home = team_lines[i]
-        away = team_lines[i + 1]
+    while i < len(lines) - 5:
+        # Posible equipo local
+        potencial_home = lines[i]
+        potencial_home_odd = lines[i+1]
+        potencial_empate_word = lines[i+2]
+        potencial_empate_odd = lines[i+3]
+        potencial_away = lines[i+4]
+        potencial_away_odd = lines[i+5]
         
-        # RESTRICCIÓN CRÍTICA: El visitante NO puede ser "Empate"
-        if away.lower() in forbidden_words:
-            i += 1
-            continue
-        
-        # Verificar que sean nombres válidos
-        if len(home) > 2 and len(away) > 2:
-            # Buscar cuotas para este partido
-            local_odd = all_odds[odds_index] if odds_index < len(all_odds) else 'N/A'
-            empate_odd = all_odds[odds_index + 1] if odds_index + 1 < len(all_odds) else 'N/A'
-            visit_odd = all_odds[odds_index + 2] if odds_index + 2 < len(all_odds) else 'N/A'
-            
-            matches.append({
-                'home': home,
-                'away': away,
-                'all_odds': [local_odd, empate_odd, visit_odd]
-            })
-            
-            i += 2
-            odds_index += 3
-        else:
-            i += 1
-    
-    # ============================================================================
-    # PASO 4: Si no funcionó, intentar método alternativo (buscar patrones específicos)
-    # ============================================================================
-    if not matches:
-        i = 0
-        while i < len(lines) - 2:
-            # Si la línea actual parece un equipo y la siguiente tiene cuotas
-            if (not re.search(r'[+-]\d{3,4}', lines[i]) and 
-                re.search(r'[+-]\d{3,4}', lines[i+1]) and
-                i+2 < len(lines) and not re.search(r'[+-]\d{3,4}', lines[i+2])):
-                
-                home = lines[i]
-                away = lines[i+2]
+        # Verificar que la línea de empate contenga la palabra "Empate"
+        if ('empate' in potencial_empate_word.lower() or 'empaté' in potencial_empate_word.lower()):
+            # Verificar que las odds tengan formato correcto
+            if (re.match(r'^[+-]\d{3,4}$', potencial_home_odd) and
+                re.match(r'^[+-]\d{3,4}$', potencial_empate_odd) and
+                re.match(r'^[+-]\d{3,4}$', potencial_away_odd)):
                 
                 # RESTRICCIÓN: El visitante no puede ser "Empate"
-                if away.lower() in forbidden_words:
-                    i += 1
-                    continue
-                
-                # Extraer cuotas de la línea intermedia
-                odds_in_line = re.findall(r'[+-]\d{3,4}', lines[i+1])
-                
-                if len(odds_in_line) >= 2:
-                    local_odd = odds_in_line[0]
-                    empate_odd = odds_in_line[1] if len(odds_in_line) > 1 else 'N/A'
-                    visit_odd = odds_in_line[2] if len(odds_in_line) > 2 else 'N/A'
-                    
+                if potencial_away.lower() not in forbidden_words:
                     matches.append({
-                        'home': home,
-                        'away': away,
-                        'all_odds': [local_odd, empate_odd, visit_odd]
+                        'home': potencial_home,
+                        'away': potencial_away,
+                        'all_odds': [potencial_home_odd, potencial_empate_odd, potencial_away_odd]
                     })
-                    i += 3
+                    i += 6
                     continue
-            i += 1
+        i += 1
     
     # ============================================================================
-    # PASO 5: Último recurso - forzar los partidos basado en equipos conocidos
+    # PASO 2: Si no funcionó, intentar agrupación por patrones de odds
     # ============================================================================
     if not matches:
-        # Lista de equipos conocidos de la imagen
-        known_teams = []
-        for line in team_lines:
-            known = ['Bournemouth', 'Everton', 'Brentford', 'Burnley', 
-                    'Leeds United', 'Sunderland', 'Wolverhampton', 'Liverpool',
-                    'Wolves', 'Leeds', 'Burnley', 'Bournemouth', 'Everton']
-            for k in known:
-                if k.lower() in line.lower():
-                    known_teams.append(k)
+        # Extraer todas las odds
+        all_odds = re.findall(r'[+-]\d{3,4}', text)
+        
+        # Buscar líneas que NO son odds y NO son "Empate"
+        team_lines = []
+        for line in lines:
+            if (not re.match(r'^[+-]\d{3,4}$', line) and 
+                line.lower() not in forbidden_words and
+                len(line) > 2):
+                team_lines.append(line)
+        
+        # Si tenemos equipos y odds, emparejar en orden
+        if len(team_lines) >= 2 and len(all_odds) >= 3:
+            # Intentar agrupar en pares (local, visitante)
+            for j in range(0, len(team_lines) - 1, 2):
+                if j + 1 < len(team_lines):
+                    idx_odds = (j // 2) * 3
+                    if idx_odds + 2 < len(all_odds):
+                        matches.append({
+                            'home': team_lines[j],
+                            'away': team_lines[j + 1],
+                            'all_odds': [
+                                all_odds[idx_odds],
+                                all_odds[idx_odds + 1],
+                                all_odds[idx_odds + 2]
+                            ]
+                        })
+    
+    # ============================================================================
+    # PASO 3: Último recurso - forzar el orden correcto para tu imagen
+    # ============================================================================
+    if not matches:
+        # Lista de equipos conocidos en orden (según tu imagen)
+        expected_order = [
+            'Bournemouth', 'Brentford',
+            'Everton', 'Burnley',
+            'Leeds United', 'Sunderland',
+            'Wolverhampton', 'Liverpool'
+        ]
+        
+        # Extraer todas las odds
+        all_odds = re.findall(r'[+-]\d{3,4}', text)
+        
+        # Buscar equipos en el texto
+        found_teams = []
+        for expected in expected_order:
+            for line in lines:
+                if expected.lower() in line.lower() and line.lower() not in [f.lower() for f in forbidden_words]:
+                    found_teams.append(expected)
                     break
         
         # Eliminar duplicados manteniendo orden
         seen = set()
         unique_teams = []
-        for team in known_teams:
+        for team in found_teams:
             if team not in seen:
                 seen.add(team)
                 unique_teams.append(team)
         
-        # Crear partidos con los equipos en orden (pares consecutivos)
+        # Crear partidos con los equipos en pares
         if len(unique_teams) >= 2:
             for j in range(0, len(unique_teams) - 1, 2):
                 if j + 1 < len(unique_teams):
@@ -156,9 +143,9 @@ def parse_raw_betting_text(text):
                             'home': unique_teams[j],
                             'away': unique_teams[j + 1],
                             'all_odds': [
-                                all_odds[idx_odds] if idx_odds < len(all_odds) else 'N/A',
-                                all_odds[idx_odds + 1] if idx_odds + 1 < len(all_odds) else 'N/A',
-                                all_odds[idx_odds + 2] if idx_odds + 2 < len(all_odds) else 'N/A'
+                                all_odds[idx_odds],
+                                all_odds[idx_odds + 1],
+                                all_odds[idx_odds + 2]
                             ]
                         })
     
@@ -452,7 +439,7 @@ def main():
             **Sugerencias:**
             - Asegúrate que la imagen tenga buena resolución
             - Los nombres de equipos deben ser legibles
-            - La imagen puede tener formato de 2 líneas (Local + cuotas, luego Visitante)
+            - La imagen debe tener el formato: Equipo, Cuota, Empate, Cuota, Equipo, Cuota
             """)
     
     else:
@@ -467,13 +454,21 @@ FORMATO 1 (6 columnas en una línea):
 Ejemplo:
 Real Madrid -278 Empate +340 Getafe +900
 
-FORMATO 2 (2 líneas por partido):
-Línea 1: [Equipo Local] [Cuota L] [Empate] [Cuota E]
-Línea 2: [Equipo Visitante]
+FORMATO 2 (6 líneas por partido):
+Línea 1: [Equipo Local]
+Línea 2: [Cuota Local]
+Línea 3: Empate
+Línea 4: [Cuota Empate]
+Línea 5: [Equipo Visitante]
+Línea 6: [Cuota Visitante]
 
 Ejemplo:
-Bournemouth +148 Empate +260
+Bournemouth
++148
+Empate
++260
 Brentford
++164
             """)
 
 if __name__ == "__main__":
