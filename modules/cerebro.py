@@ -175,3 +175,7 @@ def obtener_mejor_apuesta(stats_h, stats_a):
 def obtener_forma_reciente(team_id):
     """Obtiene la forma reciente de un equipo (wrapper para compatibilidad)."""
     return extraer_stats_avanzadas(team_id)
+
+def obtener_forma_reciente(team_id):
+    """Obtiene la forma reciente de un equipo (wrapper para compatibilidad)."""
+    return extraer_stats_avanzadas(team_id)
