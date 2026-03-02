@@ -1,124 +1,145 @@
-import pytesseract
-from PIL import Image
+# modules/ocr_reader.py
 import re
 import streamlit as st
-import numpy as np
+from google.cloud import vision
 
 class ImageParser:
     def __init__(self):
-        pytesseract.pytesseract.tesseract_cmd = '/usr/bin/tesseract'
+        """Inicializa el cliente de Google Vision usando secrets"""
+        try:
+            credentials = dict(st.secrets["google_credentials"])
+            self.client = vision.ImageAnnotatorClient.from_service_account_info(credentials)
+        except Exception as e:
+            st.error(f"Error inicializando Google Vision: {e}")
+            self.client = None
     
-    def preprocess_image(self, image):
-        """Mejora la imagen para mejor OCR"""
-        # Convertir a array si es necesario
-        if isinstance(image, Image.Image):
-            # Convertir a escala de grises
-            if image.mode != 'L':
-                image = image.convert('L')
-            
-            # Aumentar contraste
-            from PIL import ImageEnhance
-            enhancer = ImageEnhance.Contrast(image)
-            image = enhancer.enhance(2.0)
-            
-            # Binarización adaptativa
-            image = image.point(lambda x: 0 if x < 180 else 255, '1')
+    def clean_ocr_noise(self, text):
+        """Elimina ruidos de la interfaz y nombres de ligas."""
+        # Eliminar fechas, horas y marcadores
+        text = re.sub(r'\d{1,2}\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)', '', text, flags=re.IGNORECASE)
+        text = re.sub(r'\d{2}:\d{2}', '', text)
+        text = re.sub(r'\+\s*\d+', '', text)
+        text = re.sub(r'[|•\-_]', ' ', text)
         
-        return image
+        # Lista negra ampliada
+        blacklist = [
+            "Europa", "Rumania", "Turquía", "Italia", "Liga 2", "Liga 3", 
+            "TFF League", "Primavera", "Championship", "Resultado", "Final", 
+            "1", "X", "2", "Directo", "Hoy", "Mañana", "Puntos", "Score",
+            "Points", "Asia", "Australia", "Europa", "Fútbol", "Mujeres",
+            "Women", "International", "Euro", "Qualifiers", "Sub-19", "U19",
+            "State League", "Premier League", "National League", "Pervaya Liga",
+            "Victoria", "Eltham", "Bulleen", "Kyrgyzstan", "Myanmar", "Rakhine",
+            "Shan United", "FC Kyrgyzaltyn", "Oshmu-Aldiyer"  # Eliminamos ejemplos
+        ]
+        for word in blacklist:
+            text = text.replace(word, "")
+        
+        return text.strip()
+    
+    def normalize_team_name(self, name):
+        """Normaliza nombres de equipos para mejor matching"""
+        # Eliminar números y caracteres especiales
+        name = re.sub(r'[0-9+\-]', '', name)
+        # Eliminar palabras comunes
+        common = ['FC', 'CF', 'SC', 'AC', 'CD', 'UD', 'SD', 'Club', 'Deportivo']
+        for word in common:
+            name = name.replace(word, '')
+        # Limpiar espacios
+        name = ' '.join(name.split())
+        return name.strip()
+    
+    def extract_odds_from_line(self, line):
+        """Extrae cuotas de una línea de texto"""
+        # Patrón para momios americanos (+/- seguido de 3-4 dígitos)
+        odds_pattern = r'[+-]\d{3,4}'
+        return re.findall(odds_pattern, line)
     
     def parse_image(self, uploaded_file):
-        """Procesa la imagen y extrae los partidos REALES"""
+        """Procesa la imagen con Google Vision y extrae los partidos"""
+        
+        if not self.client:
+            st.error("Google Vision no inicializado")
+            return {'matches': [], 'raw_text': '', 'odds_detected': []}
+        
         try:
-            # Leer imagen
-            image = Image.open(uploaded_file)
+            content = uploaded_file.getvalue()
+            image = vision.Image(content=content)
+            response = self.client.text_detection(image=image)
             
-            # Mostrar imagen original para debug
-            st.image(image, caption="Imagen original", width=300)
+            if not response.text_annotations:
+                return {'matches': [], 'raw_text': '', 'odds_detected': []}
             
-            # Preprocesar
-            processed = self.preprocess_image(image)
+            full_text = response.text_annotations[0].description
             
-            # Mostrar imagen procesada para debug
-            st.image(processed, caption="Imagen procesada para OCR", width=300)
+            # Extraer TODOS los momios americanos
+            all_odds = re.findall(r'[+-]\d{3,4}', full_text)
             
-            # Configuración OCR optimizada
-            custom_config = r'--oem 3 --psm 6 -c tessedit_char_whitelist="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .-+"'
+            # Limpiar texto
+            clean_text = self.clean_ocr_noise(full_text)
             
-            # Extraer texto
-            text = pytesseract.image_to_string(processed, config=custom_config)
+            # Dividir en líneas y filtrar
+            lines = [l.strip() for l in clean_text.split('\n') if len(l.strip()) > 2]
             
-            # DEBUG: Mostrar texto detectado
-            st.text("Texto detectado por OCR:")
-            st.code(text)
+            matches = []
             
-            # Extraer partidos del texto
-            matches = self._extract_matches(text)
+            # ESTRATEGIA 1: Buscar patrones de 2 líneas consecutivas con odds
+            i = 0
+            while i < len(lines) - 1:
+                line1 = lines[i]
+                line2 = lines[i + 1]
+                
+                # Verificar si hay odds disponibles
+                if len(all_odds) >= 3:
+                    # Tomar las primeras 3 odds
+                    odds = all_odds[:3]
+                    all_odds = all_odds[3:]
+                    
+                    # Limpiar nombres
+                    home = self.normalize_team_name(line1)
+                    away = self.normalize_team_name(line2)
+                    
+                    # Validar que sean nombres válidos
+                    if (len(home) > 2 and len(away) > 2 and 
+                        not home.isdigit() and not away.isdigit() and
+                        not any(x in home.lower() for x in ['score', 'points', 'total'])):
+                        
+                        matches.append({
+                            "home": home,
+                            "away": away,
+                            "odds": odds,
+                            "liga": "Detectada de imagen"
+                        })
+                        i += 2  # Saltar ambas líneas
+                        continue
+                i += 1
             
-            # DEBUG: Mostrar lo que se extrajo
-            st.write("Partidos extraídos:", matches)
+            # ESTRATEGIA 2: Si no funcionó, buscar en una sola línea
+            if not matches:
+                for line in lines:
+                    odds_in_line = self.extract_odds_from_line(line)
+                    if len(odds_in_line) >= 3:
+                        # Separar equipo local y visitante (antes y después de las odds)
+                        parts = re.split(r'[+-]\d{3,4}', line)
+                        if len(parts) >= 2:
+                            home = self.normalize_team_name(parts[0])
+                            away = self.normalize_team_name(parts[-1])
+                            
+                            if home and away and len(home) > 2 and len(away) > 2:
+                                matches.append({
+                                    "home": home,
+                                    "away": away,
+                                    "odds": odds_in_line[:3],
+                                    "liga": "Detectada de imagen"
+                                })
             
+            # IMPORTANTE: NO HAY FALLBACK - si no hay matches, lista vacía
             return {
                 'matches': matches,
-                'raw_text': text
+                'raw_text': full_text,
+                'odds_detected': re.findall(r'[+-]\d{3,4}', full_text)
             }
             
         except Exception as e:
-            st.error(f"Error OCR: {str(e)}")
-            import traceback
-            st.code(traceback.format_exc())
-            return {'matches': [], 'raw_text': ''}
-    
-    def _extract_matches(self, text):
-        """Extrae partidos del texto con mejor detección"""
-        matches = []
-        lines = text.split('\n')
-        
-        # Patrones para detectar cuotas
-        odds_pattern = r'[+-]?\d+\.?\d*'
-        
-        for line in lines:
-            line = line.strip()
-            if len(line) < 10:  # Ignorar líneas muy cortas
-                continue
-            
-            # Buscar líneas con posible formato de partido
-            # Patrón: Equipo + números (cuotas) + Equipo
-            parts = re.split(r'\s+', line)
-            
-            # Buscar números que parezcan cuotas
-            number_indices = [i for i, p in enumerate(parts) if re.match(odds_pattern, p)]
-            
-            if len(number_indices) >= 3:  # Tiene al menos 3 números (cuotas)
-                # Tomar texto antes del primer número como equipo local
-                if number_indices[0] > 0:
-                    local = ' '.join(parts[:number_indices[0]])
-                    
-                    # Tomar texto después del último número como equipo visitante
-                    if number_indices[-1] < len(parts) - 1:
-                        visitante = ' '.join(parts[number_indices[-1]+1:])
-                        
-                        # Limpiar nombres
-                        local = re.sub(r'[^A-Za-z\s]', '', local).strip()
-                        visitante = re.sub(r'[^A-Za-z\s]', '', visitante).strip()
-                        
-                        if local and visitante and len(local) > 3 and len(visitante) > 3:
-                            matches.append({
-                                'local': local,
-                                'visitante': visitante,
-                                'liga': 'Detectada de imagen'
-                            })
-        
-        # Si no encuentra con ese patrón, buscar "vs"
-        if not matches:
-            for line in lines:
-                if ' vs ' in line.lower():
-                    parts = re.split(r'\s+vs\s+', line, flags=re.IGNORECASE)
-                    if len(parts) == 2:
-                        matches.append({
-                            'local': parts[0].strip(),
-                            'visitante': parts[1].strip(),
-                            'liga': 'Detectada de imagen'
-                        })
-        
-        # NO HAY FALLBACK - si no encuentra, devuelve lista vacía
-        return matches
+            st.error(f"Error en OCR: {e}")
+            return {'matches': [], 'raw_text': '', 'odds_detected': []}
