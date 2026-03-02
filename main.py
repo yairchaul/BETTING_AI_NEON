@@ -3,14 +3,17 @@ import pandas as pd
 from modules.ocr_reader import ImageParser
 from modules.analyzer import MatchAnalyzer
 from modules.parlay_builder import show_parlay_options
+from modules.betting_tracker import BettingTracker
 
 st.set_page_config(page_title="Analizador de Partidos IA", layout="wide")
 
 @st.cache_resource
 def init_components():
+    """Inicializa componentes con cache para mejorar rendimiento"""
     return {
         'parser': ImageParser(),
-        'analyzer': MatchAnalyzer(st.secrets.get("FOOTBALL_API_KEY", ""))
+        'analyzer': MatchAnalyzer(st.secrets.get("FOOTBALL_API_KEY", "")),
+        'tracker': BettingTracker()
     }
 
 components = init_components()
@@ -66,6 +69,9 @@ def main():
         
         # Modo debug
         debug_mode = st.checkbox("🔧 Modo debug", value=True)
+        
+        # Mostrar tracker en sidebar
+        components['tracker'].show_tracker_ui()
     
     # ============================================================================
     # ÁREA PRINCIPAL
@@ -81,7 +87,6 @@ def main():
         )
         
         if uploaded_file:
-            # Mostrar imagen con el nuevo parámetro
             st.image(uploaded_file, caption="Imagen subida", use_container_width=True)
     
     if uploaded_file:
@@ -90,23 +95,30 @@ def main():
             result = components['parser'].parse_image(uploaded_file)
             matches = result['matches']
             raw_text = result['raw_text']
+            odds_detected = result.get('odds_detected', [])
         
         # Mostrar texto detectado en modo debug
         if debug_mode:
             with st.expander("🔬 Ver texto detectado (debug)", expanded=True):
                 st.text(raw_text)
+                if odds_detected:
+                    st.caption(f"🎲 Cuotas detectadas: {odds_detected}")
         
         if matches:
             with col2:
                 st.subheader(f"2. Partidos detectados ({len(matches)})")
                 
                 # Mostrar tabla de partidos detectados
-                df_matches = pd.DataFrame(matches)
+                df_matches = pd.DataFrame([
+                    {
+                        'Local': m.get('home', m.get('local', '')),
+                        'Visitante': m.get('away', m.get('visitante', '')),
+                        'Liga': m.get('liga', 'Desconocida'),
+                        'Cuotas': ', '.join(m.get('odds', ['N/A']))
+                    }
+                    for m in matches
+                ])
                 st.dataframe(df_matches, use_container_width=True)
-                
-                # Advertencia si son datos de prueba
-               if not matches:
-    st.warning("⚠️ No se detectaron partidos en la imagen")
             
             st.divider()
             st.subheader("3. Análisis partido por partido")
@@ -115,12 +127,15 @@ def main():
             
             # Analizar cada partido detectado
             for i, match in enumerate(matches):
-                with st.expander(f"📊 {match['local']} vs {match['visitante']}", expanded=i==0):
+                home = match.get('home', match.get('local', ''))
+                away = match.get('away', match.get('visitante', ''))
+                
+                with st.expander(f"📊 {home} vs {away}", expanded=i==0):
                     
                     # Analizar el partido
                     analysis = components['analyzer'].analyze_match(
-                        match['local'], 
-                        match['visitante'], 
+                        home, 
+                        away, 
                         match.get('liga', '')
                     )
                     
@@ -129,14 +144,20 @@ def main():
                     with col_a:
                         if analysis.get('home_found'):
                             st.success(f"✅ Local: {analysis['home_team']}")
+                            st.caption(f"ID: {analysis.get('home_id', 'N/A')}")
                         else:
-                            st.warning(f"⚠️ Local: {match['local']} (no encontrado en API)")
+                            st.warning(f"⚠️ Local: {home} (no encontrado en API)")
                     
                     with col_b:
                         if analysis.get('away_found'):
                             st.success(f"✅ Visitante: {analysis['away_team']}")
+                            st.caption(f"ID: {analysis.get('away_id', 'N/A')}")
                         else:
-                            st.warning(f"⚠️ Visitante: {match['visitante']} (no encontrado en API)")
+                            st.warning(f"⚠️ Visitante: {away} (no encontrado en API)")
+                    
+                    # Mostrar cuotas si están disponibles
+                    if 'odds' in match:
+                        st.caption(f"🎲 Cuotas: Local {match['odds'][0]}, Empate {match['odds'][1]}, Visitante {match['odds'][2]}")
                     
                     # ====================================================================
                     # FILTRAR MERCADOS POR PROBABILIDAD Y CATEGORÍA
@@ -201,7 +222,7 @@ def main():
                         seen_matches.add(pick['match'])
                         unique_picks.append(pick)
                 
-                show_parlay_options(unique_picks)
+                show_parlay_options(unique_picks, components['tracker'])
             else:
                 st.info("ℹ️ No hay suficientes picks para generar parlays")
         
@@ -221,15 +242,11 @@ def main():
         
         with st.expander("📋 Ver ejemplo de formato aceptado"):
             st.code("""
-Asia - Kyrgyzstan - Pervaya Liga
-FC Kyrgyzaltyn vs Oshmu-Aldiyer
-02 Mar 03:00
-Puntos: +17
-
-Australia - Victoria Premier League 2
-Bulleen Lions vs Eltham Redbacks FC
-02 Mar 03:30
-Puntos: +16
+Real Madrid -278 Empate +340 Getafe +900
+Rayo Vallecano -145 Empate +265 Real Oviedo +410
+Celta de Vigo +330 Empate +290 Real Madrid -132
+Osasuna -132 Empate +245 RCD Mallorca +390
+Levante +178 Empate +235 Girona +150
             """)
         
         with st.expander("ℹ️ Cómo funciona"):
@@ -237,26 +254,28 @@ Puntos: +16
             ### 🎯 Flujo de análisis:
             
             1. **Subes una captura** de cualquier casa de apuestas
-            2. **El OCR detecta** los nombres de equipos automáticamente
-            3. **Buscamos los equipos** en la base de datos global (API-Sports)
-            4. **Simulamos el partido** con Monte Carlo (20,000 simulaciones)
-            5. **Analizamos TODOS los mercados** posibles:
+            2. **Google Vision OCR** detecta los nombres de equipos y cuotas
+            3. **Algoritmo de matching** busca los equipos en API-Sports (70%+ similitud)
+            4. **Simulación Monte Carlo** (20,000 iteraciones) genera probabilidades
+            5. **Analizamos 20+ mercados** por partido:
                - Resultado final (1X2)
                - Doble oportunidad
                - Totales de goles (Over 0.5 hasta Over 5.5)
                - Primer tiempo (goles y BTTS)
                - Handicaps y goleadas
                - Equipos goleadores (3+ goles)
-            6. **Te mostramos la mejor opción** para cada partido
-            7. **Generamos parlays** combinando las mejores selecciones
-            8. **Registra tus apuestas** y lleva tracking de resultados
+            6. **Filtros inteligentes** por categoría y probabilidad
+            7. **Generación de parlays** con valor esperado (EV) positivo
+            8. **Registro de apuestas** con tracking de resultados
             
-            ### 🆕 Novedades:
+            ### 🆕 Novedades v2.0:
             - ✅ Over 5.5 goles para equipos goleadores (como PSV)
             - ✅ Over 1.5 goles en primer tiempo
             - ✅ Ambos anotan en primer tiempo
+            - ✅ Matching inteligente de nombres (70% similitud)
+            - ✅ Sistema de registro y tracking de apuestas
             - ✅ Filtros por categoría de mercado
-            - ✅ Sistema de registro de apuestas
+            - ✅ Modo debug para ver texto detectado
             """)
 
 if __name__ == "__main__":
