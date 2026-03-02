@@ -105,8 +105,8 @@ def main():
                 st.dataframe(df_matches, use_container_width=True)
                 
                 # Advertencia si son datos de prueba
-                if matches[0].get('liga') == 'Kyrgyzstan League':
-                    st.warning("⚠️ Usando datos de ejemplo - El OCR no detectó partidos en la imagen")
+               if not matches:
+    st.warning("⚠️ No se detectaron partidos en la imagen")
             
             st.divider()
             st.subheader("3. Análisis partido por partido")
