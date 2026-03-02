@@ -4,7 +4,7 @@ import re
 import numpy as np
 from modules.vision_reader import ImageParser
 from modules.groq_vision import GroqVisionParser
-from modules.pro_analyzer_ultimate import ProAnalyzerUltimate
+from modules.pro_analyzer_ultimate import ProAnalyzerUltimate  # <-- NUEVO
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
 
@@ -16,7 +16,7 @@ def init_components():
     return {
         'vision': ImageParser(),
         'groq_vision': GroqVisionParser() if st.secrets.get("GROQ_API_KEY") else None,
-        'analyzer': ProAnalyzerUltimate(),
+        'analyzer': ProAnalyzerUltimate(),  # <-- CAMBIADO
         'tracker': BettingTracker()
     }
 
@@ -31,7 +31,7 @@ def parse_raw_betting_text(text):
     i = 0
     
     # Lista de palabras que NO son equipos
-    non_team_words = ['empate', 'draw', 'vs', '+', '-', 'fc', 'cf', 'sc', 'ac', 'cd']
+    non_team_words = ['empate', 'draw', 'vs', '+', '-', 'fc', 'cf', 'sc', 'ac', 'cd', 'ud', 'sd']
     
     while i < len(lines):
         line = lines[i].strip()
@@ -400,19 +400,21 @@ Banfield -103 Empate +210 Aldosivi +335
             1. **Detecta la liga** automáticamente (Argentina, Premier, Bundesliga, etc.)
             2. **Conoce el contexto** de cada liga (goles promedio, ventaja local)
             3. **Identifica equipos TOP** (River, PSG, Bayern, etc.)
-            4. **Aplica reglas de experto**:
+            4. **Aplica reglas de experto** para TODAS las ligas del mundo:
                - En Argentina → Under 2.5 (pocos goles)
                - En Bundesliga → Over 2.5 (muchos goles)
                - Local TOP vs débil → Gana local
                - Visitante TOP vs débil → Gana visitante
+               - Y muchas más...
             5. **Recomienda la mejor apuesta** con explicación
             
-            ### 📊 Para tus 4 partidos argentinos, el sistema dará:
-            
-            ✅ Estudiantes vs Vélez → Doble oportunidad (Local o Empate)
-            ✅ Riestra vs Platense → Under 2.5 goles
-            ✅ Independiente Rivadavia vs River → Gana River
-            ✅ Banfield vs Aldosivi → Gana Banfield
+            ### 🌍 Cobertura global:
+            - ✅ 100+ ligas de todo el mundo
+            - ✅ Sudamérica: Argentina, Brasil, Chile, Colombia, etc.
+            - ✅ Europa: Premier, LaLiga, Bundesliga, Serie A, etc.
+            - ✅ Asia: Japón, Corea, China, Arabia, etc.
+            - ✅ África: Egipto, Sudáfrica
+            - ✅ Concacaf: México, MLS, Costa Rica, etc.
             """)
 
 if __name__ == "__main__":
