@@ -1,3 +1,4 @@
+# modules/team_matcher.py
 import requests
 import unicodedata
 import re
@@ -9,18 +10,46 @@ class TeamMatcher:
         self.cache = {}
     
     def normalize(self, name):
-        """Normaliza nombres para comparación"""
-        name = unicodedata.normalize('NFKD', name.lower())
+        """Normalización avanzada para matching"""
+        # Convertir a minúsculas
+        name = name.lower().strip()
+        
+        # Quitar acentos
+        name = unicodedata.normalize('NFKD', name)
         name = ''.join([c for c in name if not unicodedata.combining(c)])
-        name = re.sub(r'[^a-z0-9]', '', name)
+        
+        # Quitar caracteres especiales
+        name = re.sub(r'[^a-z0-9\s]', '', name)
+        
+        # Quitar palabras comunes
+        common_words = ['fc', 'cf', 'sc', 'ac', 'us', 'as', 'cd', 'real', 
+                       'united', 'city', 'athletic', 'deportivo', 'club', 
+                       'team', 'de', 'del', 'la', 'el', 'los', 'las',
+                       'and', '&', 'vs', 'v']
+        for word in common_words:
+            name = re.sub(r'\b' + word + r'\b', '', name)
+        
+        # Quitar espacios múltiples
+        name = re.sub(r'\s+', ' ', name).strip()
+        
         return name
     
     def similarity(self, a, b):
-        """Calcula similitud entre dos nombres"""
-        return SequenceMatcher(None, self.normalize(a), self.normalize(b)).ratio()
+        """Calcula similitud con múltiples estrategias"""
+        n1 = self.normalize(a)
+        n2 = self.normalize(b)
+        
+        # Similitud de secuencia
+        ratio = SequenceMatcher(None, n1, n2).ratio()
+        
+        # Bonus si una cadena contiene a la otra
+        if n1 in n2 or n2 in n1:
+            ratio += 0.1
+            
+        return min(ratio, 1.0)
     
     def find_team(self, team_name, league_hint=None):
-        """Busca equipo en API-Sports"""
+        """Busca equipo con estrategias múltiples"""
         cache_key = f"{team_name}_{league_hint}"
         if cache_key in self.cache:
             return self.cache[cache_key]
@@ -31,17 +60,29 @@ class TeamMatcher:
         try:
             headers = {'x-apisports-key': self.api_key}
             
-            # Búsqueda directa
-            url = f"https://v3.football.api-sports.io/teams?search={team_name}"
+            # Estrategia 1: Búsqueda exacta
+            search_name = requests.utils.quote(team_name)
+            url = f"https://v3.football.api-sports.io/teams?search={search_name}"
             response = requests.get(url, headers=headers).json()
             
             if response.get('results', 0) > 0:
-                team = response['response'][0]['team']
-                self.cache[cache_key] = team
-                return team
+                # Verificar similitud
+                best_match = None
+                best_score = 0
+                
+                for item in response['response']:
+                    team = item['team']
+                    score = self.similarity(team_name, team['name'])
+                    if score > best_score and score > 0.5:
+                        best_score = score
+                        best_match = team
+                
+                if best_match:
+                    self.cache[cache_key] = best_match
+                    return best_match
             
-            # Búsqueda por liga si hay hint
-            if league_hint:
+            # Estrategia 2: Si hay liga, buscar en esa liga
+            if league_hint and league_hint != "Detectada de imagen":
                 league_norm = self.normalize(league_hint)
                 league_url = f"https://v3.football.api-sports.io/leagues?search={league_norm}"
                 league_resp = requests.get(league_url, headers=headers).json()
@@ -57,15 +98,31 @@ class TeamMatcher:
                     for item in teams_resp.get('response', []):
                         team = item['team']
                         score = self.similarity(team_name, team['name'])
-                        if score > best_score and score > 0.6:
+                        if score > best_score and score > 0.4:
                             best_score = score
                             best_match = team
                     
                     if best_match:
                         self.cache[cache_key] = best_match
                         return best_match
-        except:
-            pass
+            
+            # Estrategia 3: Búsqueda por palabra más significativa
+            words = team_name.split()
+            for word in words:
+                if len(word) > 3:
+                    url = f"https://v3.football.api-sports.io/teams?search={word}"
+                    response = requests.get(url, headers=headers).json()
+                    
+                    if response.get('results', 0) > 0:
+                        for item in response['response']:
+                            team = item['team']
+                            score = self.similarity(team_name, team['name'])
+                            if score > 0.6:
+                                self.cache[cache_key] = team
+                                return team
+            
+        except Exception as e:
+            print(f"Error buscando equipo: {e}")
         
         self.cache[cache_key] = None
         return None
