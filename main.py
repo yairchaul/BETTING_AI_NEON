@@ -3,11 +3,11 @@ import pandas as pd
 import re
 from modules.vision_reader import ImageParser
 from modules.groq_vision import GroqVisionParser
-from modules.analyzer import MatchAnalyzer
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
 from modules.team_matcher import TeamMatcher
 from modules.ev_engine import build_smart_parlay
+from modules.real_analyzer import RealAnalyzer
 
 st.set_page_config(page_title="Analizador de Partidos IA", layout="wide")
 
@@ -17,7 +17,7 @@ def init_components():
     return {
         'vision': ImageParser(),
         'groq_vision': GroqVisionParser() if st.secrets.get("GROQ_API_KEY") else None,
-        'analyzer': MatchAnalyzer(st.secrets.get("FOOTBALL_API_KEY", "")),
+        'analyzer': RealAnalyzer(),
         'tracker': BettingTracker(),
         'matcher': TeamMatcher(st.secrets.get("FOOTBALL_API_KEY", ""))
     }
@@ -75,7 +75,7 @@ def main():
             "Selecciona categorías",
             ["1X2", "Doble Oportunidad", "Totales", "Primer Tiempo", 
              "BTTS", "Handicap", "Goleador", "Combinado", "Totales (Especial)"],
-            default=["1X2", "Totales", "Primer Tiempo", "BTTS"],
+            default=["1X2", "Totales", "Primer Tiempo", "BTTS", "Totales (Especial)"],
             help="Selecciona qué tipos de mercados quieres ver"
         )
         
@@ -113,15 +113,26 @@ def main():
         col_api1, col_api2 = st.columns(2)
         with col_api1:
             if st.secrets.get("FOOTBALL_API_KEY"):
-                st.success("⚽ API")
+                st.success("⚽ API Football")
             else:
-                st.warning("⚽ No API")
+                st.warning("⚽ No API Football")
         
         with col_api2:
             if st.secrets.get("GROQ_API_KEY"):
-                st.success("🤖 Groq")
+                st.success("🤖 Groq AI")
             else:
                 st.warning("🤖 No Groq")
+        
+        # Mostrar estado de otras APIs
+        if st.secrets.get("GOOGLE_API_KEY") and st.secrets.get("GOOGLE_CSE_ID"):
+            st.success("🔍 Google CSE")
+        else:
+            st.warning("🔍 No Google CSE")
+            
+        if st.secrets.get("ODDS_API_KEY"):
+            st.success("📊 Odds API")
+        else:
+            st.warning("📊 No Odds API")
         
         debug_mode = st.checkbox("🔧 Mostrar debug OCR", value=True)
         components['tracker'].show_tracker_ui()
@@ -146,7 +157,7 @@ def main():
         with st.spinner("🔍 Extrayendo datos y limpiando texto..."):
             img_bytes = uploaded_file.getvalue()
             matches = []
-            metodo_usado = "OCR Tradicional"
+            metodo_usado = "Ninguno"
             raw_text = ""
             
             # ============================================================================
@@ -172,6 +183,7 @@ def main():
                         raw_text = response.text_annotations[0].description
                         matches = parse_raw_betting_text(raw_text)
                         metodo_usado = "Parseo Regex (tu función)"
+                        st.info(f"📝 Usando {metodo_usado}")
                 except Exception as e:
                     st.error(f"Error en OCR: {e}")
             
@@ -181,6 +193,7 @@ def main():
             if not matches:
                 matches = components['vision'].process_image(img_bytes)
                 metodo_usado = "Vision Reader Tradicional"
+                st.info(f"🔄 Usando {metodo_usado}")
 
         # ============================================================================
         # TABLA DE 6 COLUMNAS (ESTILO IMAGEN REQUERIDA)
@@ -251,10 +264,10 @@ def main():
                         st.code(raw_text[:500])
 
             # ============================================================================
-            # ANÁLISIS POR PARTIDO Y EV ENGINE
+            # ANÁLISIS POR PARTIDO CON REAL ANALYZER (basado en últimos 5 partidos)
             # ============================================================================
             st.divider()
-            st.subheader("3. Análisis de IA y Valor Esperado")
+            st.subheader("3. Análisis basado en últimos 5 partidos (IA + Estadísticas)")
             
             all_picks_for_ev = []
             all_picks_simple = []
@@ -267,48 +280,60 @@ def main():
                 with st.expander(f"📊 {home} vs {away}", expanded=i==0):
                     # Mostrar cuotas
                     if odds and odds[0] != 'N/A':
-                        st.caption(f"🎲 **Cuotas:** Local {odds[0]} | Empate {odds[1]} | Visitante {odds[2]}")
+                        st.caption(f"🎲 **Cuotas reales de la imagen:** Local {odds[0]} | Empate {odds[1]} | Visitante {odds[2]}")
                     
-                    # Analizar el partido
-                    analysis = components['analyzer'].analyze_match(home, away, "")
+                    # Analizar el partido con REAL ANALYZER (basado en últimos 5 partidos)
+                    analysis = components['analyzer'].analyze_match(home, away)
                     
-                    # Mostrar resultados de búsqueda
+                    # Mostrar resultados de búsqueda de equipos
                     col_a, col_b = st.columns(2)
                     with col_a:
                         if analysis.get('home_found'):
-                            st.success(f"✅ Local encontrado: {analysis['home_team']}")
+                            st.success(f"✅ {analysis['home_team']} encontrado en API - Analizando últimos 5 partidos")
+                            if 'stats' in analysis:
+                                st.caption(f"   ⚽ Promedio goles: {analysis['stats']['home_goals_for']:.2f} GF | {analysis['stats']['home_goals_against']:.2f} GC")
                         else:
-                            st.warning(f"⚠️ Local: {home} (no encontrado en API)")
+                            st.warning(f"⚠️ {home} (no encontrado en API - usando estadísticas genéricas)")
                     
                     with col_b:
                         if analysis.get('away_found'):
-                            st.success(f"✅ Visitante encontrado: {analysis['away_team']}")
+                            st.success(f"✅ {analysis['away_team']} encontrado en API - Analizando últimos 5 partidos")
+                            if 'stats' in analysis:
+                                st.caption(f"   ⚽ Promedio goles: {analysis['stats']['away_goals_for']:.2f} GF | {analysis['stats']['away_goals_against']:.2f} GC")
                         else:
-                            st.warning(f"⚠️ Visitante: {away} (no encontrado en API)")
+                            st.warning(f"⚠️ {away} (no encontrado en API - usando estadísticas genéricas)")
                     
-                    # Filtrar mercados
+                    # Mostrar estadísticas generales
+                    st.caption(f"📊 Goles promedio esperados: {analysis['probabilidades']['goles_promedio']:.2f}")
+                    
+                    # Filtrar mercados por categoría y probabilidad mínima
                     markets_filtered = [
                         m for m in analysis['markets'] 
                         if m['prob'] >= prob_minima and m['category'] in categorias
                     ]
                     
+                    # Resaltar mercados especiales (Over 4.5+)
+                    if show_high_scoring:
+                        for m in markets_filtered:
+                            if 'Over 4.5' in m['name'] or 'Over 5.5' in m['name']:
+                                m['highlight'] = True
+                    
                     if markets_filtered:
-                        # Mostrar estadísticas generales
-                        st.caption(f"📊 Goles promedio esperados: {analysis['probabilidades']['goles_promedio']:.2f}")
-                        
                         # Crear DataFrame para mostrar mercados
                         market_df = pd.DataFrame([{
-                            'Mercado': m['name'],
+                            'Mercado': ("🔴 " if m.get('highlight') else "") + m['name'],
                             'Probabilidad': f"{m['prob']:.1%}",
                             'Categoría': m['category']
-                        } for m in markets_filtered[:8]])
+                        } for m in markets_filtered[:10]])
                         
                         st.dataframe(market_df, use_container_width=True, hide_index=True)
                         
-                        # Guardar para parlays simples
+                        # Mejor opción
                         best = markets_filtered[0]
-                        st.success(f"✨ **Mejor opción:** {best['name']} - {best['prob']:.1%}")
+                        best_emoji = "🔴" if best.get('highlight') else "✨"
+                        st.success(f"{best_emoji} **Mejor opción:** {best['name']} - {best['prob']:.1%}")
                         
+                        # Guardar para parlays simples
                         all_picks_simple.append({
                             'match': f"{analysis['home_team']} vs {analysis['away_team']}",
                             'selection': best['name'],
@@ -316,18 +341,22 @@ def main():
                             'category': best['category']
                         })
                         
-                        # Preparar picks para EV Engine
+                        # Preparar picks para EV Engine (usando cuotas reales de la imagen)
                         for m in markets_filtered[:3]:
-                            # Lógica simple de conversión de cuota para EV
                             try:
+                                # Determinar qué odds usar según el mercado
                                 if 'Local' in m['name'] and odds[0] != 'N/A':
                                     o_val = int(odds[0])
                                     decimal_odd = (o_val/100)+1 if o_val > 0 else (100/abs(o_val))+1
                                 elif 'Visitante' in m['name'] and odds[2] != 'N/A':
                                     o_val = int(odds[2])
                                     decimal_odd = (o_val/100)+1 if o_val > 0 else (100/abs(o_val))+1
+                                elif 'Empate' in m['name'] and odds[1] != 'N/A':
+                                    o_val = int(odds[1])
+                                    decimal_odd = (o_val/100)+1 if o_val > 0 else (100/abs(o_val))+1
                                 else:
-                                    decimal_odd = 2.0
+                                    # Si no hay odds específicas, usar probabilidad inversa
+                                    decimal_odd = (1 / m['prob']) * 0.95
                                 
                                 ev = (m['prob'] * decimal_odd) - 1
                                 
@@ -340,8 +369,12 @@ def main():
                                         'ev': ev,
                                         'category': m['category']
                                     })
-                            except:
-                                pass
+                            except Exception as e:
+                                if debug_mode:
+                                    st.caption(f"Nota: No se pudo calcular EV para {m['name']}")
+                    
+                    else:
+                        st.info("📭 No hay mercados con los filtros seleccionados")
             
             # ============================================================================
             # GENERACIÓN DE PARLAYS
@@ -351,7 +384,7 @@ def main():
             col_parlay1, col_parlay2 = st.columns(2)
             
             with col_parlay1:
-                st.subheader("🎯 Parlays Simples")
+                st.subheader("🎯 Parlays Simples (Mejores opciones)")
                 if all_picks_simple:
                     from modules.parlay_builder import show_parlay_options as show_simple_parlays
                     show_simple_parlays(all_picks_simple, components['tracker'])
@@ -359,13 +392,25 @@ def main():
                     st.info("ℹ️ No hay suficientes picks para generar parlays simples")
             
             with col_parlay2:
-                st.subheader("📈 Parlay Inteligente (EV+)")
+                st.subheader("📈 Parlay Inteligente (Basado en EV+)")
                 if all_picks_for_ev:
                     smart = build_smart_parlay(all_picks_for_ev)
                     if smart:
                         with st.container(border=True):
-                            st.markdown(f"**Cuota Total:** {smart['total_odd']} | **EV:** {smart['total_ev']:.2%}")
+                            st.markdown(f"**Cuota Total:** {smart['total_odd']}")
                             st.markdown(f"**Probabilidad Combinada:** {smart['combined_prob']:.1%}")
+                            st.markdown(f"**Valor Esperado (EV):** {smart['total_ev']:.2%}")
+                            
+                            # Color según EV
+                            if smart['total_ev'] > 0.2:
+                                st.markdown("🟢 **EV Alto - Muy Recomendado**")
+                            elif smart['total_ev'] > 0.1:
+                                st.markdown("🟡 **EV Moderado - Recomendado**")
+                            elif smart['total_ev'] > 0.05:
+                                st.markdown("🟠 **EV Bajo - Considerar riesgo**")
+                            else:
+                                st.markdown("🔴 **EV Negativo - No recomendado**")
+                            
                             st.markdown("**Selecciones:**")
                             for m in smart['matches']:
                                 st.markdown(f"• {m}")
@@ -380,6 +425,14 @@ def main():
                                 st.rerun()
                     else:
                         st.info("📭 No se encontraron parlays con EV positivo")
+                        
+                        # Mostrar top picks con mejor EV
+                        if all_picks_for_ev:
+                            st.caption("**Top picks individuales con mejor EV:**")
+                            top_ev_picks = sorted(all_picks_for_ev, key=lambda x: x['ev'], reverse=True)[:5]
+                            for p in top_ev_picks:
+                                ev_color = "🟢" if p['ev'] > 0.1 else "🟡" if p['ev'] > 0.05 else "🟠"
+                                st.markdown(f"{ev_color} {p['match']}: {p['selection']} (EV: {p['ev']:.2%})")
                 else:
                     st.info("ℹ️ No hay picks con EV suficiente")
         
@@ -406,6 +459,36 @@ Rayo Vallecano -145 Empate +265 Real Oviedo +410
 Celta de Vigo +330 Empate +290 Real Madrid -132
 Osasuna -132 Empate +245 RCD Mallorca +390
 Levante +178 Empate +235 Girona +150
+            """)
+        
+        with st.expander("ℹ️ Cómo funciona"):
+            st.markdown("""
+            ### 🎯 Flujo de análisis:
+            
+            1. **Subes una captura** de cualquier casa de apuestas
+            2. **Google Vision OCR** o **Groq Vision AI** detectan los datos
+            3. **Extraemos equipos y cuotas** en formato de 6 columnas
+            4. **Buscamos cada equipo** en múltiples APIs (Football API, Google CSE, Odds API)
+            5. **Obtenemos últimos 5 partidos** de cada equipo
+            6. **Calculamos estadísticas reales**: promedios de goles, BTTS, overs
+            7. **Generamos 20+ mercados** basados en datos reales
+            8. **Seleccionamos la mejor opción** para cada partido
+            9. **Creamos parlays optimizados** con Valor Esperado (EV) positivo
+            10. **Registramos apuestas** y tracking de resultados
+            
+            ### 📊 Mercados analizados:
+            - ✅ Resultado Final (1X2)
+            - ✅ Ambos Equipos Anotan (BTTS)
+            - ✅ Over/Under 1.5, 2.5, 3.5, 4.5, 5.5
+            - ✅ 1ra Mitad (goles y BTTS)
+            - ✅ Combinados (Local + Over, Visitante + Over, BTTS + Over)
+            - ✅ Handicaps y goleadas
+            
+            ### 🔍 Motores de búsqueda utilizados:
+            - **Football API Sports** → Base de datos principal
+            - **Google Custom Search** → Búsqueda de IDs cuando falla la API
+            - **Odds API** → Información adicional de partidos
+            - **Groq Vision AI** → Interpretación inteligente de imágenes
             """)
 
 if __name__ == "__main__":
