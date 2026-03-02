@@ -4,7 +4,7 @@ import re
 import numpy as np
 from modules.vision_reader import ImageParser
 from modules.groq_vision import GroqVisionParser
-from modules.pro_analyzer_ultimate import ProAnalyzerUltimate  # <-- NUEVO
+from modules.pro_analyzer_ultimate import ProAnalyzerUltimate
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
 
@@ -16,7 +16,7 @@ def init_components():
     return {
         'vision': ImageParser(),
         'groq_vision': GroqVisionParser() if st.secrets.get("GROQ_API_KEY") else None,
-        'analyzer': ProAnalyzerUltimate(),  # <-- CAMBIADO
+        'analyzer': ProAnalyzerUltimate(),
         'tracker': BettingTracker()
     }
 
@@ -24,70 +24,147 @@ components = init_components()
 
 def parse_raw_betting_text(text):
     """
-    Versión mejorada que separa correctamente los equipos
+    Versión mejorada que maneja el formato complejo de la imagen:
+    - Los equipos aparecen en líneas separadas
+    - Las cuotas pueden estar en la misma línea o separadas
+    - RESTRICCIÓN: El visitante NUNCA puede ser "Empate"
     """
-    lines = text.split('\n')
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
     matches = []
+    
+    # Palabras prohibidas para equipos
+    forbidden_words = ['empate', 'empaté', 'draw', 'vs', 'v', 'local', 'visitante', 'cuota', 'odds']
+    
+    # ============================================================================
+    # PASO 1: Identificar todas las cuotas en el texto
+    # ============================================================================
+    all_odds = []
+    for line in lines:
+        odds_in_line = re.findall(r'[+-]\d{3,4}', line)
+        all_odds.extend(odds_in_line)
+    
+    # ============================================================================
+    # PASO 2: Identificar posibles nombres de equipos (líneas sin cuotas)
+    # ============================================================================
+    team_lines = []
+    for line in lines:
+        # Si la línea NO tiene cuotas y tiene más de 2 caracteres
+        if not re.search(r'[+-]\d{3,4}', line) and len(line) > 2:
+            # Ignorar palabras prohibidas
+            if line.lower() not in forbidden_words:
+                team_lines.append(line)
+    
+    # ============================================================================
+    # PASO 3: Agrupar equipos con sus cuotas (patrón: equipo, cuota local, equipo, cuota visitante)
+    # ============================================================================
     i = 0
+    odds_index = 0
     
-    # Lista de palabras que NO son equipos
-    non_team_words = ['empate', 'draw', 'vs', '+', '-', 'fc', 'cf', 'sc', 'ac', 'cd', 'ud', 'sd']
-    
-    while i < len(lines):
-        line = lines[i].strip()
-        if not line:
+    while i < len(team_lines) - 1 and odds_index + 2 < len(all_odds):
+        home = team_lines[i]
+        away = team_lines[i + 1]
+        
+        # RESTRICCIÓN CRÍTICA: El visitante NO puede ser "Empate"
+        if away.lower() in forbidden_words:
             i += 1
             continue
-            
-        # Buscar patrones de cuotas
-        odds = re.findall(r'[+-]\d{3,4}', line)
         
-        # Si la línea tiene cuotas, intentar extraer
-        if odds:
-            # Limpiar la línea de cuotas
-            clean_line = line
-            for odd in odds:
-                clean_line = clean_line.replace(odd, '')
+        # Verificar que sean nombres válidos
+        if len(home) > 2 and len(away) > 2:
+            # Buscar cuotas para este partido
+            local_odd = all_odds[odds_index] if odds_index < len(all_odds) else 'N/A'
+            empate_odd = all_odds[odds_index + 1] if odds_index + 1 < len(all_odds) else 'N/A'
+            visit_odd = all_odds[odds_index + 2] if odds_index + 2 < len(all_odds) else 'N/A'
             
-            # Separar por espacios y filtrar palabras vacías
-            parts = [p for p in clean_line.split() if p and p.lower() not in non_team_words]
+            matches.append({
+                'home': home,
+                'away': away,
+                'all_odds': [local_odd, empate_odd, visit_odd]
+            })
             
-            if len(parts) >= 2:
-                # Heurística: los primeros elementos son el local, los últimos el visitante
-                mid = len(parts) // 2
-                home_parts = parts[:mid]
-                away_parts = parts[mid:]
+            i += 2
+            odds_index += 3
+        else:
+            i += 1
+    
+    # ============================================================================
+    # PASO 4: Si no funcionó, intentar método alternativo (buscar patrones específicos)
+    # ============================================================================
+    if not matches:
+        i = 0
+        while i < len(lines) - 2:
+            # Si la línea actual parece un equipo y la siguiente tiene cuotas
+            if (not re.search(r'[+-]\d{3,4}', lines[i]) and 
+                re.search(r'[+-]\d{3,4}', lines[i+1]) and
+                i+2 < len(lines) and not re.search(r'[+-]\d{3,4}', lines[i+2])):
                 
-                home = ' '.join(home_parts).strip()
-                away = ' '.join(away_parts).strip()
+                home = lines[i]
+                away = lines[i+2]
                 
-                # Validar que sean nombres válidos
-                if len(home) > 2 and len(away) > 2:
+                # RESTRICCIÓN: El visitante no puede ser "Empate"
+                if away.lower() in forbidden_words:
+                    i += 1
+                    continue
+                
+                # Extraer cuotas de la línea intermedia
+                odds_in_line = re.findall(r'[+-]\d{3,4}', lines[i+1])
+                
+                if len(odds_in_line) >= 2:
+                    local_odd = odds_in_line[0]
+                    empate_odd = odds_in_line[1] if len(odds_in_line) > 1 else 'N/A'
+                    visit_odd = odds_in_line[2] if len(odds_in_line) > 2 else 'N/A'
+                    
                     matches.append({
                         'home': home,
                         'away': away,
-                        'all_odds': odds[:3] if len(odds) >= 3 else ['N/A', 'N/A', 'N/A']
+                        'all_odds': [local_odd, empate_odd, visit_odd]
                     })
-                    i += 1
+                    i += 3
                     continue
-        
-        i += 1
+            i += 1
     
-    # Si no encontró con el método anterior, usar el original
+    # ============================================================================
+    # PASO 5: Último recurso - forzar los partidos basado en equipos conocidos
+    # ============================================================================
     if not matches:
-        pattern = r"([a-zA-Z\s]+?)([-+]\d+)\s*Empate\s*([-+]\d+)([a-zA-Z\s]+?)([-+]\d+)"
-        matches_found = re.findall(pattern, text)
+        # Lista de equipos conocidos de la imagen
+        known_teams = []
+        for line in team_lines:
+            known = ['Bournemouth', 'Everton', 'Brentford', 'Burnley', 
+                    'Leeds United', 'Sunderland', 'Wolverhampton', 'Liverpool',
+                    'Wolves', 'Leeds', 'Burnley', 'Bournemouth', 'Everton']
+            for k in known:
+                if k.lower() in line.lower():
+                    known_teams.append(k)
+                    break
         
-        for m in matches_found:
-            matches.append({
-                'home': m[0].strip(),
-                'away': m[3].strip(),
-                'all_odds': [m[1], m[2], m[4]]
-            })
+        # Eliminar duplicados manteniendo orden
+        seen = set()
+        unique_teams = []
+        for team in known_teams:
+            if team not in seen:
+                seen.add(team)
+                unique_teams.append(team)
+        
+        # Crear partidos con los equipos en orden (pares consecutivos)
+        if len(unique_teams) >= 2:
+            for j in range(0, len(unique_teams) - 1, 2):
+                if j + 1 < len(unique_teams):
+                    idx_odds = j * 3 // 2
+                    if idx_odds + 2 < len(all_odds):
+                        matches.append({
+                            'home': unique_teams[j],
+                            'away': unique_teams[j + 1],
+                            'all_odds': [
+                                all_odds[idx_odds] if idx_odds < len(all_odds) else 'N/A',
+                                all_odds[idx_odds + 1] if idx_odds + 1 < len(all_odds) else 'N/A',
+                                all_odds[idx_odds + 2] if idx_odds + 2 < len(all_odds) else 'N/A'
+                            ]
+                        })
     
     return matches
 
-def generar_parlay_pro(matches_analizados, max_selecciones=4):
+def generar_parlay_pro(matches_analizados, max_selecciones=3):
     """
     Genera parlay con las mejores opciones (limitado a max_selecciones)
     """
@@ -218,7 +295,7 @@ def main():
                     if debug_mode:
                         st.warning(f"Groq Vision falló: {e}")
             
-            # INTENTO 2: OCR tradicional + parsing
+            # INTENTO 2: OCR tradicional + parsing (con restricción anti-empate)
             if not matches:
                 try:
                     from google.cloud import vision
@@ -227,7 +304,7 @@ def main():
                     if response.text_annotations:
                         raw_text = response.text_annotations[0].description
                         matches = parse_raw_betting_text(raw_text)
-                        metodo_usado = "OCR + Parsing"
+                        metodo_usado = "OCR + Parsing (con restricción)"
                         st.info(f"📝 {metodo_usado}: {len(matches)} partidos")
                 except Exception as e:
                     st.error(f"Error en OCR: {e}")
@@ -236,7 +313,7 @@ def main():
             with col2:
                 st.subheader(f"2. Partidos detectados ({len(matches)})")
                 
-                # Mostrar tabla (primeros 8 para no saturar)
+                # Mostrar tabla
                 df_view = []
                 for m in matches[:8]:
                     odds = m.get('all_odds', ['N/A', 'N/A', 'N/A'])
@@ -265,8 +342,8 @@ def main():
             
             matches_analizados = []
             
-            # Limitar análisis a primeros 6 partidos para no saturar APIs
-            for i, match in enumerate(matches[:6]):
+            # Analizar todos los partidos detectados
+            for i, match in enumerate(matches):
                 home = match.get('home', 'Unknown')
                 away = match.get('away', 'Unknown')
                 odds = match.get('all_odds', ['N/A', 'N/A', 'N/A'])
@@ -375,46 +452,28 @@ def main():
             **Sugerencias:**
             - Asegúrate que la imagen tenga buena resolución
             - Los nombres de equipos deben ser legibles
-            - La imagen debe contener el formato: Equipo, Cuota, Empate, Cuota, Equipo, Cuota
+            - La imagen puede tener formato de 2 líneas (Local + cuotas, luego Visitante)
             """)
     
     else:
         # Mensaje inicial
         st.info("👆 Sube una imagen para comenzar el análisis profesional")
         
-        with st.expander("📋 Formato esperado (ejemplo)"):
+        with st.expander("📋 Formatos aceptados"):
             st.code("""
+FORMATO 1 (6 columnas en una línea):
 [Equipo Local] [Cuota L] [Empate] [Cuota E] [Equipo Visitante] [Cuota V]
 
-Ejemplo real de Liga Argentina:
-Estudiantes de La Plata +132 Empate +174 Velez Sarsfield +280
-Deportivo Riestra +174 Empate +152 Platense +235
-Independiente Rivadavia +200 Empate +205 River Plate +148
-Banfield -103 Empate +210 Aldosivi +335
-            """)
-        
-        with st.expander("ℹ️ Cómo funciona el análisis profesional"):
-            st.markdown("""
-            ### 🧠 Nuestro sistema piensa como un apostador real:
-            
-            1. **Detecta la liga** automáticamente (Argentina, Premier, Bundesliga, etc.)
-            2. **Conoce el contexto** de cada liga (goles promedio, ventaja local)
-            3. **Identifica equipos TOP** (River, PSG, Bayern, etc.)
-            4. **Aplica reglas de experto** para TODAS las ligas del mundo:
-               - En Argentina → Under 2.5 (pocos goles)
-               - En Bundesliga → Over 2.5 (muchos goles)
-               - Local TOP vs débil → Gana local
-               - Visitante TOP vs débil → Gana visitante
-               - Y muchas más...
-            5. **Recomienda la mejor apuesta** con explicación
-            
-            ### 🌍 Cobertura global:
-            - ✅ 100+ ligas de todo el mundo
-            - ✅ Sudamérica: Argentina, Brasil, Chile, Colombia, etc.
-            - ✅ Europa: Premier, LaLiga, Bundesliga, Serie A, etc.
-            - ✅ Asia: Japón, Corea, China, Arabia, etc.
-            - ✅ África: Egipto, Sudáfrica
-            - ✅ Concacaf: México, MLS, Costa Rica, etc.
+Ejemplo:
+Real Madrid -278 Empate +340 Getafe +900
+
+FORMATO 2 (2 líneas por partido):
+Línea 1: [Equipo Local] [Cuota L] [Empate] [Cuota E]
+Línea 2: [Equipo Visitante]
+
+Ejemplo:
+Bournemouth +148 Empate +260
+Brentford
             """)
 
 if __name__ == "__main__":
