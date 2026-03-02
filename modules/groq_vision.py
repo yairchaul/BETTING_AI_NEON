@@ -9,8 +9,8 @@ class GroqVisionParser:
     def __init__(self):
         """Inicializa el cliente de Groq"""
         self.client = Groq(api_key=st.secrets.get("GROQ_API_KEY", ""))
-        # Modelo de visión actualizado (el que sí funciona)
-        self.model = "llama-3.2-11b-vision-preview"  # Modelo activo
+        # Modelo de visión actualizado (probamos con este)
+        self.model = "llama-3.2-90b-vision-preview"  # Modelo actual
     
     def encode_image(self, image_bytes):
         """Convierte la imagen a base64"""
@@ -97,54 +97,3 @@ class GroqVisionParser:
         except Exception as e:
             st.error(f"Error en Groq Vision: {e}")
             return []
-    
-    def extract_matches_simple(self, image_bytes):
-        """
-        Versión simplificada si la anterior falla
-        """
-        try:
-            base64_image = self.encode_image(image_bytes)
-            
-            prompt = """
-            Esta imagen contiene una tabla de fútbol. Dame SOLO los nombres de los equipos en orden.
-            Primero los locales, luego los visitantes.
-            Formato de respuesta JSON:
-            {
-                "locales": ["equipo1", "equipo2", "equipo3", "equipo4"],
-                "visitantes": ["equipo5", "equipo6", "equipo7", "equipo8"]
-            }
-            """
-            
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{base64_image}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                temperature=0.1,
-                max_tokens=1000
-            )
-            
-            content = response.choices[0].message.content
-            content = re.sub(r'```json\s*|\s*```', '', content)
-            content = re.sub(r'```\s*', '', content)
-            
-            json_match = re.search(r'\{.*\}', content, re.DOTALL)
-            if json_match:
-                content = json_match.group()
-            
-            return json.loads(content)
-            
-        except Exception as e:
-            st.error(f"Error en Groq Vision simple: {e}")
-            return None
