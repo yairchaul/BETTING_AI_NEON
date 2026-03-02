@@ -85,22 +85,121 @@ def main():
             st.image(uploaded_file, caption="Imagen subida", use_container_width=True)
     
     if uploaded_file:
-        # --- CORRECCIÓN: PROCESAMIENTO DE IMAGEN ---
+        # ============================================================================
+        # DIAGNÓSTICO: VER MÉTODOS DISPONIBLES EN ImageParser
+        # ============================================================================
+        if debug_mode:
+            with st.expander("🔧 DIAGNÓSTICO - Métodos de ImageParser", expanded=False):
+                st.write("**Inspeccionando objeto vision_reader.ImageParser...**")
+                
+                # Listar todos los métodos y atributos
+                all_attrs = dir(components['vision'])
+                methods = [attr for attr in all_attrs if not attr.startswith('_')]
+                st.write("**Métodos públicos disponibles:**")
+                st.write(methods)
+                
+                # Verificar específicamente process_image
+                if hasattr(components['vision'], 'process_image'):
+                    st.success("✅ El método 'process_image' SÍ existe")
+                else:
+                    st.error("❌ El método 'process_image' NO existe")
+                    
+                    # Buscar métodos similares
+                    similar = [m for m in methods if 'image' in m.lower() or 'process' in m.lower() or 'parse' in m.lower()]
+                    if similar:
+                        st.write("**Métodos similares encontrados:**")
+                        st.write(similar)
+        
+        # ============================================================================
+        # NUEVA LÓGICA DE PROCESAMIENTO COMPATIBLE (CON TU CÓDIGO)
+        # ============================================================================
         with st.spinner("🔍 Procesando imagen con Google Vision..."):
-            # Guardar la posición actual del puntero
-            uploaded_file.seek(0)
-            img_bytes = uploaded_file.read()
+            # Usamos .getvalue() en lugar de .read() para evitar que el archivo se "vacíe"
+            img_bytes = uploaded_file.getvalue()
             
-            # Llamar al método process_image de vision_reader.py
-            matches = components['vision'].process_image(img_bytes)
-            
-            # Obtener texto raw para debug
+            # Variable para almacenar resultados
+            matches = []
+            method_used = None
             raw_text = ""
+            
+            # INTENTO 1: Llamar directamente al método process_image (tu código original)
             try:
-                # Resetear el puntero para leer de nuevo si es necesario
-                uploaded_file.seek(0)
-                img_bytes_debug = uploaded_file.read()
-                response = components['vision'].client.text_detection(image={'content': img_bytes_debug})
+                if hasattr(components['vision'], 'process_image'):
+                    matches = components['vision'].process_image(img_bytes)
+                    method_used = 'process_image (directo)'
+                    st.success(f"✅ Usando método: {method_used}")
+            except Exception as e:
+                if debug_mode:
+                    st.warning(f"⚠️ process_image falló: {e}")
+            
+            # INTENTO 2: Si el primero falló, probar con otros métodos comunes
+            if not matches:
+                possible_methods = ['parse_image', 'analyze_image', 'detect_matches', 'extract_matches', 'smart_parse']
+                
+                for method_name in possible_methods:
+                    if hasattr(components['vision'], method_name):
+                        try:
+                            method = getattr(components['vision'], method_name)
+                            
+                            # Algunos métodos esperan bytes, otros texto
+                            if method_name == 'smart_parse':
+                                # Primero obtener texto
+                                from google.cloud import vision
+                                image = vision.Image(content=img_bytes)
+                                response = components['vision'].client.text_detection(image=image)
+                                if response.text_annotations:
+                                    text = response.text_annotations[0].description
+                                    result = method(text)
+                                else:
+                                    result = []
+                            else:
+                                # La mayoría espera bytes
+                                result = method(img_bytes)
+                            
+                            if result:
+                                matches = result
+                                method_used = method_name
+                                st.success(f"✅ Método alternativo funcionando: {method_name}")
+                                break
+                        except Exception as e:
+                            if debug_mode:
+                                st.warning(f"❌ Método {method_name} falló: {e}")
+                            continue
+            
+            # INTENTO 3: Acceso directo al cliente de Vision
+            if not matches:
+                try:
+                    from google.cloud import vision
+                    image = vision.Image(content=img_bytes)
+                    response = components['vision'].client.text_detection(image=image)
+                    if response.text_annotations:
+                        text = response.text_annotations[0].description
+                        
+                        # Usar smart_parse si existe
+                        if hasattr(components['vision'], 'smart_parse'):
+                            matches = components['vision'].smart_parse(text)
+                            method_used = 'smart_parse (vía cliente directo)'
+                        else:
+                            # Fallback básico: asumir que los equipos están en líneas alternadas
+                            lines = text.split('\n')
+                            clean_lines = [l.strip() for l in lines if len(l.strip()) > 3]
+                            matches = []
+                            for i in range(0, len(clean_lines)-1, 2):
+                                if i+1 < len(clean_lines):
+                                    matches.append({
+                                        'home': clean_lines[i],
+                                        'away': clean_lines[i+1]
+                                    })
+                            method_used = 'fallback básico (líneas alternadas)'
+                except Exception as e:
+                    if debug_mode:
+                        st.error(f"Error en acceso directo: {e}")
+            
+            # Obtener texto raw para debug (siempre intentar)
+            try:
+                from google.cloud import vision
+                image = vision.Image(content=img_bytes)
+                response = components['vision'].client.text_detection(image=image)
                 if response.text_annotations:
                     raw_text = response.text_annotations[0].description
                     
@@ -111,16 +210,21 @@ def main():
                 if debug_mode:
                     st.warning(f"Nota: No se pudo obtener texto raw: {e}")
         
-        # --- MOSTRAR DEBUG ---
+        # ============================================================================
+        # MOSTRAR DEBUG
+        # ============================================================================
         if debug_mode:
             with st.expander("🔧 Debug OCR - Información de detección", expanded=True):
+                st.write(f"**Método utilizado:** {method_used or 'Ninguno'}")
                 st.write(f"**Partidos detectados:** {len(matches)}")
                 
                 if matches:
                     st.write("**Detalle de detecciones:**")
                     for i, m in enumerate(matches):
-                        odds_str = ", ".join(m.get('all_odds', ['N/A', 'N/A', 'N/A']))
-                        st.write(f"{i+1}. {m['home']} vs {m['away']} → Odds: {odds_str}")
+                        home = m.get('home', m.get('local', 'N/A'))
+                        away = m.get('away', m.get('visitante', 'N/A'))
+                        odds = m.get('all_odds', m.get('odds', ['N/A']))
+                        st.write(f"{i+1}. {home} vs {away} → Odds: {odds}")
                 
                 if raw_text:
                     st.write("**Texto raw detectado (primeros 500 caracteres):**")
@@ -131,10 +235,12 @@ def main():
                 st.subheader(f"2. Partidos detectados ({len(matches)})")
                 df_data = []
                 for m in matches:
-                    odds = m.get('all_odds', ['N/A', 'N/A', 'N/A'])
+                    home = m.get('home', m.get('local', 'N/A'))
+                    away = m.get('away', m.get('visitante', 'N/A'))
+                    odds = m.get('all_odds', m.get('odds', ['N/A', 'N/A', 'N/A']))
                     df_data.append({
-                        'Local': m['home'],
-                        'Visitante': m['away'],
+                        'Local': home,
+                        'Visitante': away,
                         'Cuota L': odds[0] if len(odds) > 0 else 'N/A',
                         'Cuota E': odds[1] if len(odds) > 1 else 'N/A',
                         'Cuota V': odds[2] if len(odds) > 2 else 'N/A'
@@ -146,9 +252,9 @@ def main():
             
             all_picks = []
             for i, match in enumerate(matches):
-                home = match['home']
-                away = match['away']
-                odds = match.get('all_odds', ['N/A', 'N/A', 'N/A'])
+                home = match.get('home', match.get('local', ''))
+                away = match.get('away', match.get('visitante', ''))
+                odds = match.get('all_odds', match.get('odds', ['N/A', 'N/A', 'N/A']))
                 
                 with st.expander(f"📊 {home} vs {away}", expanded=i==0):
                     # Mostrar cuotas si están disponibles
