@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from modules.ocr_reader import ImageParser
+from modules.vision_reader import ImageParser  # Cambiado a vision_reader
 from modules.analyzer import MatchAnalyzer
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
@@ -11,9 +11,9 @@ st.set_page_config(page_title="Analizador de Partidos IA", layout="wide")
 def init_components():
     """Inicializa componentes con cache para mejorar rendimiento"""
     return {
-        'parser': ImageParser(),
+        'parser': ImageParser(),  # Ahora usa vision_reader
         'analyzer': MatchAnalyzer(st.secrets.get("FOOTBALL_API_KEY", "")),
-        'tracker': BettingTracker()  # Esto ahora maneja su propia inicialización
+        'tracker': BettingTracker()
     }
 
 components = init_components()
@@ -95,14 +95,39 @@ def main():
             result = components['parser'].parse_image(uploaded_file)
             matches = result['matches']
             raw_text = result['raw_text']
-            odds_detected = result.get('odds_detected', [])
+            debug_lines = result.get('debug', [])
         
-        # Mostrar texto detectado en modo debug
-        if debug_mode:
-            with st.expander("🔬 Ver texto detectado (debug)", expanded=True):
+        # ============================================================================
+        # NUEVO SISTEMA DE DEBUG - Mostrar en la parte superior
+        # ============================================================================
+        if debug_mode and debug_lines:
+            with st.container():
+                st.markdown("---")
+                st.subheader("🔍 DEBUG OCR - Procesamiento")
+                
+                # Mostrar cada línea de debug con su formato correspondiente
+                for line in debug_lines:
+                    if line.startswith('✅'):
+                        st.success(line)
+                    elif line.startswith('❌'):
+                        st.error(line)
+                    elif line.startswith('⚠️'):
+                        st.warning(line)
+                    elif line.startswith('ℹ️'):
+                        st.info(line)
+                    else:
+                        st.text(line)
+                
+                # Mostrar estadísticas del OCR
+                if 'words_detected' in result:
+                    st.caption(f"📊 Palabras detectadas: {result['words_detected']}")
+                
+                st.markdown("---")
+        
+        # También mostrar texto raw en expander (opcional)
+        if debug_mode and raw_text:
+            with st.expander("🔬 Ver texto completo detectado"):
                 st.text(raw_text)
-                if odds_detected:
-                    st.caption(f"🎲 Cuotas detectadas: {odds_detected}")
         
         if matches:
             with col2:
@@ -156,7 +181,7 @@ def main():
                             st.warning(f"⚠️ Visitante: {away} (no encontrado en API)")
                     
                     # Mostrar cuotas si están disponibles
-                    if 'odds' in match:
+                    if 'odds' in match and len(match['odds']) >= 3:
                         st.caption(f"🎲 Cuotas: Local {match['odds'][0]}, Empate {match['odds'][1]}, Visitante {match['odds'][2]}")
                     
                     # ====================================================================
@@ -275,8 +300,11 @@ Levante +178 Empate +235 Girona +150
             - ✅ Matching inteligente de nombres (70% similitud)
             - ✅ Sistema de registro y tracking de apuestas
             - ✅ Filtros por categoría de mercado
-            - ✅ Modo debug para ver texto detectado
+            - ✅ Modo debug avanzado con emojis
             """)
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()
