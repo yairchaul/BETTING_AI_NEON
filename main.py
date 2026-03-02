@@ -5,6 +5,7 @@ import numpy as np
 from modules.vision_reader import ImageParser
 from modules.groq_vision import GroqVisionParser
 from modules.pro_analyzer_ultimate import ProAnalyzerUltimate
+from modules.odds_integrator import OddsIntegrator
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
 
@@ -17,6 +18,7 @@ def init_components():
         'vision': ImageParser(),
         'groq_vision': GroqVisionParser() if st.secrets.get("GROQ_API_KEY") else None,
         'analyzer': ProAnalyzerUltimate(),
+        'odds': OddsIntegrator(),
         'tracker': BettingTracker()
     }
 
@@ -24,14 +26,7 @@ components = init_components()
 
 def parse_raw_betting_text(text):
     """
-    Versión CORREGIDA que respeta el orden correcto de los partidos:
-    Los partidos vienen en grupos de 6 líneas:
-    1. Equipo Local
-    2. Cuota Local
-    3. "Empate" o "Empaté"
-    4. Cuota Empate
-    5. Equipo Visitante
-    6. Cuota Visitante
+    Versión CORREGIDA que respeta el orden correcto de los partidos
     """
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     matches = []
@@ -44,7 +39,6 @@ def parse_raw_betting_text(text):
     # ============================================================================
     i = 0
     while i < len(lines) - 5:
-        # Posible equipo local
         potencial_home = lines[i]
         potencial_home_odd = lines[i+1]
         potencial_empate_word = lines[i+2]
@@ -52,14 +46,11 @@ def parse_raw_betting_text(text):
         potencial_away = lines[i+4]
         potencial_away_odd = lines[i+5]
         
-        # Verificar que la línea de empate contenga la palabra "Empate"
         if ('empate' in potencial_empate_word.lower() or 'empaté' in potencial_empate_word.lower()):
-            # Verificar que las odds tengan formato correcto
             if (re.match(r'^[+-]\d{3,4}$', potencial_home_odd) and
                 re.match(r'^[+-]\d{3,4}$', potencial_empate_odd) and
                 re.match(r'^[+-]\d{3,4}$', potencial_away_odd)):
                 
-                # RESTRICCIÓN: El visitante no puede ser "Empate"
                 if potencial_away.lower() not in forbidden_words:
                     matches.append({
                         'home': potencial_home,
@@ -70,85 +61,6 @@ def parse_raw_betting_text(text):
                     continue
         i += 1
     
-    # ============================================================================
-    # PASO 2: Si no funcionó, intentar agrupación por patrones de odds
-    # ============================================================================
-    if not matches:
-        # Extraer todas las odds
-        all_odds = re.findall(r'[+-]\d{3,4}', text)
-        
-        # Buscar líneas que NO son odds y NO son "Empate"
-        team_lines = []
-        for line in lines:
-            if (not re.match(r'^[+-]\d{3,4}$', line) and 
-                line.lower() not in forbidden_words and
-                len(line) > 2):
-                team_lines.append(line)
-        
-        # Si tenemos equipos y odds, emparejar en orden
-        if len(team_lines) >= 2 and len(all_odds) >= 3:
-            # Intentar agrupar en pares (local, visitante)
-            for j in range(0, len(team_lines) - 1, 2):
-                if j + 1 < len(team_lines):
-                    idx_odds = (j // 2) * 3
-                    if idx_odds + 2 < len(all_odds):
-                        matches.append({
-                            'home': team_lines[j],
-                            'away': team_lines[j + 1],
-                            'all_odds': [
-                                all_odds[idx_odds],
-                                all_odds[idx_odds + 1],
-                                all_odds[idx_odds + 2]
-                            ]
-                        })
-    
-    # ============================================================================
-    # PASO 3: Último recurso - forzar el orden correcto para tu imagen
-    # ============================================================================
-    if not matches:
-        # Lista de equipos conocidos en orden (según tu imagen)
-        expected_order = [
-            'Bournemouth', 'Brentford',
-            'Everton', 'Burnley',
-            'Leeds United', 'Sunderland',
-            'Wolverhampton', 'Liverpool'
-        ]
-        
-        # Extraer todas las odds
-        all_odds = re.findall(r'[+-]\d{3,4}', text)
-        
-        # Buscar equipos en el texto
-        found_teams = []
-        for expected in expected_order:
-            for line in lines:
-                if expected.lower() in line.lower() and line.lower() not in [f.lower() for f in forbidden_words]:
-                    found_teams.append(expected)
-                    break
-        
-        # Eliminar duplicados manteniendo orden
-        seen = set()
-        unique_teams = []
-        for team in found_teams:
-            if team not in seen:
-                seen.add(team)
-                unique_teams.append(team)
-        
-        # Crear partidos con los equipos en pares
-        if len(unique_teams) >= 2:
-            for j in range(0, len(unique_teams) - 1, 2):
-                if j + 1 < len(unique_teams):
-                    idx_odds = j * 3 // 2
-                    if idx_odds + 2 < len(all_odds):
-                        matches.append({
-                            'home': unique_teams[j],
-                            'away': unique_teams[j + 1],
-                            'all_odds': [
-                                all_odds[idx_odds],
-                                all_odds[idx_odds + 1],
-                                all_odds[idx_odds + 2]
-                            ]
-                        })
-    
     return matches
 
 def generar_parlay_pro(matches_analizados, max_selecciones=3):
@@ -158,11 +70,10 @@ def generar_parlay_pro(matches_analizados, max_selecciones=3):
     if len(matches_analizados) < 2:
         return None
     
-    # Ordenar por probabilidad descendente
     selecciones_ordenadas = []
     for match in matches_analizados:
         best = match.get('best_bet', {})
-        if best and best.get('probability', 0) > 0.55:  # Umbral mínimo
+        if best and best.get('probability', 0) > 0.55:
             selecciones_ordenadas.append({
                 'partido': f"{match.get('home_team', 'Unknown')} vs {match.get('away_team', 'Unknown')}",
                 'apuesta': best.get('market', 'Over 1.5 goles'),
@@ -172,16 +83,12 @@ def generar_parlay_pro(matches_analizados, max_selecciones=3):
                 'razon': best.get('reason', '')
             })
     
-    # Ordenar por probabilidad (mayor a menor)
     selecciones_ordenadas.sort(key=lambda x: x['prob'], reverse=True)
-    
-    # Tomar las mejores N
     selecciones = selecciones_ordenadas[:max_selecciones]
     
     if len(selecciones) >= 2:
         prob_total = np.prod([s['prob'] for s in selecciones])
         
-        # Determinar nivel de confianza del parlay
         confianzas = [s['confianza'] for s in selecciones]
         if 'ALTA' in confianzas and len([c for c in confianzas if c == 'ALTA']) >= 2:
             nivel_confianza = 'ALTO'
@@ -202,20 +109,10 @@ def main():
     st.title("🎯 Analizador Profesional de Apuestas")
     st.markdown("**Piensa como un apostador profesional** - Analiza cualquier partido del mundo")
     
-    # ============================================================================
-    # SIDEBAR CONFIGURACIÓN
-    # ============================================================================
     with st.sidebar:
         st.header("⚙️ Configuración")
         
-        prob_minima = st.slider(
-            "Probabilidad mínima", 
-            min_value=0.0, 
-            max_value=1.0, 
-            value=0.55, 
-            step=0.05,
-            help="Solo muestra mercados con probabilidad mayor a este valor"
-        )
+        prob_minima = st.slider("Probabilidad mínima", 0.0, 1.0, 0.55, 0.05)
         
         st.subheader("🎲 Mercados")
         categorias = st.multiselect(
@@ -224,13 +121,14 @@ def main():
             default=["1X2", "Totales", "BTTS"]
         )
         
-        # Límite de selecciones para parlay
+        # Opción para verificar odds en vivo
+        check_live_odds = st.checkbox("📡 Verificar odds en vivo", value=True)
+        
         max_parlay = st.slider("Máximo selecciones por parlay", 2, 5, 3, 1)
         
         st.divider()
         
-        # Estado de APIs
-        col_api1, col_api2 = st.columns(2)
+        col_api1, col_api2, col_api3 = st.columns(3)
         with col_api1:
             if st.secrets.get("FOOTBALL_API_KEY"):
                 st.success("⚽ API")
@@ -243,24 +141,20 @@ def main():
             else:
                 st.warning("🤖 No Groq")
         
-        debug_mode = st.checkbox("🔧 Modo debug", value=True)
+        with col_api3:
+            if st.secrets.get("ODDS_API_KEY"):
+                st.success("📊 Odds")
+            else:
+                st.warning("📊 No Odds")
         
-        # Mostrar tracker de apuestas
+        debug_mode = st.checkbox("🔧 Modo debug", value=True)
         components['tracker'].show_tracker_ui()
     
-    # ============================================================================
-    # ÁREA PRINCIPAL
-    # ============================================================================
     col1, col2 = st.columns([1, 1])
     
     with col1:
         st.subheader("1. Sube tu captura")
-        uploaded_file = st.file_uploader(
-            "Selecciona imagen", 
-            type=['png', 'jpg', 'jpeg'],
-            help="Sube una captura de pantalla con partidos y cuotas"
-        )
-        
+        uploaded_file = st.file_uploader("Selecciona imagen", type=['png', 'jpg', 'jpeg'])
         if uploaded_file:
             st.image(uploaded_file, use_container_width=True)
     
@@ -271,7 +165,7 @@ def main():
             raw_text = ""
             metodo_usado = "Ninguno"
             
-            # INTENTO 1: Groq Vision (si está disponible)
+            # INTENTO 1: Groq Vision
             if components['groq_vision']:
                 try:
                     matches = components['groq_vision'].extract_matches_with_vision(img_bytes)
@@ -282,7 +176,7 @@ def main():
                     if debug_mode:
                         st.warning(f"Groq Vision falló: {e}")
             
-            # INTENTO 2: OCR tradicional + parsing (con restricción anti-empate)
+            # INTENTO 2: OCR tradicional
             if not matches:
                 try:
                     from google.cloud import vision
@@ -291,7 +185,7 @@ def main():
                     if response.text_annotations:
                         raw_text = response.text_annotations[0].description
                         matches = parse_raw_betting_text(raw_text)
-                        metodo_usado = "OCR + Parsing (con restricción)"
+                        metodo_usado = "OCR + Parsing"
                         st.info(f"📝 {metodo_usado}: {len(matches)} partidos")
                 except Exception as e:
                     st.error(f"Error en OCR: {e}")
@@ -300,7 +194,6 @@ def main():
             with col2:
                 st.subheader(f"2. Partidos detectados ({len(matches)})")
                 
-                # Mostrar tabla
                 df_view = []
                 for m in matches[:8]:
                     odds = m.get('all_odds', ['N/A', 'N/A', 'N/A'])
@@ -315,21 +208,16 @@ def main():
                 
                 if df_view:
                     st.dataframe(pd.DataFrame(df_view), use_container_width=True, hide_index=True)
-                    
-                    if len(matches) > 8:
-                        st.caption(f"... y {len(matches)-8} partidos más")
             
-            # Debug info
             if debug_mode and raw_text:
                 with st.expander("🔬 Ver texto raw detectado"):
                     st.code(raw_text[:500])
             
             st.divider()
-            st.subheader("3. Análisis Profesional (como apostador real)")
+            st.subheader("3. Análisis Profesional")
             
             matches_analizados = []
             
-            # Analizar todos los partidos detectados
             for i, match in enumerate(matches):
                 home = match.get('home', 'Unknown')
                 away = match.get('away', 'Unknown')
@@ -338,30 +226,39 @@ def main():
                 with st.expander(f"📊 {home} vs {away}", expanded=i==0):
                     st.caption(f"🎲 Cuotas: Local {odds[0]} | Empate {odds[1]} | Visitante {odds[2]}")
                     
-                    # Análisis con ProAnalyzerUltimate
-                    with st.spinner("🤔 Analizando..."):
-                        analysis = components['analyzer'].analyze_match(home, away, odds)
+                    analysis = components['analyzer'].analyze_match(home, away, odds)
                     
                     if analysis:
-                        # Mostrar liga detectada
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
-                        # Mostrar reglas aplicadas (debug)
+                        # Verificar odds en vivo si está activado
+                        if check_live_odds:
+                            fixture_id = components['odds'].get_fixture_id(home, away, liga)
+                            if fixture_id:
+                                with st.spinner("📡 Consultando odds en vivo..."):
+                                    live_odds = components['odds'].get_best_odds(fixture_id)
+                                    if live_odds:
+                                        st.success("📊 Odds en vivo encontradas:")
+                                        col_odd1, col_odd2, col_odd3 = st.columns(3)
+                                        with col_odd1:
+                                            st.metric("Local", f"{live_odds['home']['value']}", 
+                                                     f"{live_odds['home']['bookmaker'][:10]}")
+                                        with col_odd2:
+                                            st.metric("Empate", f"{live_odds['draw']['value']}", 
+                                                     f"{live_odds['draw']['bookmaker'][:10]}")
+                                        with col_odd3:
+                                            st.metric("Visitante", f"{live_odds['away']['value']}", 
+                                                     f"{live_odds['away']['bookmaker'][:10]}")
+                        
                         if debug_mode and analysis.get('reglas_aplicadas'):
                             with st.expander("📋 Reglas aplicadas"):
                                 for r in analysis['reglas_aplicadas']:
                                     st.caption(f"• {r}")
                         
-                        # Mostrar mejor apuesta
                         best = analysis.get('best_bet', {})
                         if best:
-                            # Determinar color según confianza
-                            conf_color = {
-                                'ALTA': '🟢',
-                                'MEDIA': '🟡',
-                                'BAJA': '🔴'
-                            }.get(best.get('confidence', 'MEDIA'), '⚪')
+                            conf_color = {'ALTA': '🟢', 'MEDIA': '🟡', 'BAJA': '🔴'}.get(best.get('confidence', 'MEDIA'), '⚪')
                             
                             with st.container(border=True):
                                 st.markdown(f"### {conf_color} RECOMENDACIÓN DEL EXPERTO")
@@ -369,7 +266,6 @@ def main():
                                 st.markdown(f"📌 *{best.get('reason', 'Análisis basado en contexto de liga')}*")
                                 st.caption(f"Confianza: {best.get('confidence', 'MEDIA')}")
                         
-                        # Mostrar mercados disponibles (filtrados)
                         markets_filtered = [
                             m for m in analysis.get('markets', []) 
                             if m.get('prob', 0) >= prob_minima and m.get('category', '') in categorias
@@ -386,9 +282,6 @@ def main():
                         
                         matches_analizados.append(analysis)
             
-            # ============================================================================
-            # PARLAY PROFESIONAL
-            # ============================================================================
             if matches_analizados:
                 st.divider()
                 st.subheader("🎯 Parlay Recomendado por el Experto")
@@ -397,7 +290,6 @@ def main():
                 
                 if parlay_pro:
                     with st.container(border=True):
-                        # Métricas principales
                         col_p1, col_p2, col_p3 = st.columns(3)
                         with col_p1:
                             st.metric("Cuota Estimada", parlay_pro['cuota_estimada'])
@@ -405,14 +297,9 @@ def main():
                             prob_pct = parlay_pro['probabilidad_total'] * 100
                             st.metric("Probabilidad Total", f"{prob_pct:.1f}%")
                         with col_p3:
-                            conf_emoji = {
-                                'ALTO': '🟢', 
-                                'MEDIO': '🟡', 
-                                'BAJO': '🔴'
-                            }.get(parlay_pro['nivel_confianza'], '⚪')
+                            conf_emoji = {'ALTO': '🟢', 'MEDIO': '🟡', 'BAJO': '🔴'}.get(parlay_pro['nivel_confianza'], '⚪')
                             st.metric("Confianza", f"{conf_emoji} {parlay_pro['nivel_confianza']}")
                         
-                        # Selecciones
                         st.markdown("**Selecciones del parlay:**")
                         for s in parlay_pro['selecciones']:
                             conf_emoji = '🟢' if s['confianza'] == 'ALTA' else '🟡' if s['confianza'] == 'MEDIA' else '🔴'
@@ -420,7 +307,6 @@ def main():
                             if s.get('razon'):
                                 st.caption(f"   📌 {s['razon']}")
                         
-                        # Botón para registrar
                         if st.button("📝 Registrar este parlay", key="register_pro"):
                             components['tracker'].add_bet({
                                 'matches': [f"{s['partido']}: {s['apuesta']}" for s in parlay_pro['selecciones']],
@@ -431,45 +317,12 @@ def main():
                             st.rerun()
                 else:
                     st.info("No hay suficientes partidos con alta probabilidad para formar un parlay")
-                    st.caption("Prueba con una probabilidad mínima más baja o más partidos")
         
         else:
             st.error("❌ No se detectaron partidos en la imagen")
-            st.info("""
-            **Sugerencias:**
-            - Asegúrate que la imagen tenga buena resolución
-            - Los nombres de equipos deben ser legibles
-            - La imagen debe tener el formato: Equipo, Cuota, Empate, Cuota, Equipo, Cuota
-            """)
     
     else:
-        # Mensaje inicial
         st.info("👆 Sube una imagen para comenzar el análisis profesional")
-        
-        with st.expander("📋 Formatos aceptados"):
-            st.code("""
-FORMATO 1 (6 columnas en una línea):
-[Equipo Local] [Cuota L] [Empate] [Cuota E] [Equipo Visitante] [Cuota V]
-
-Ejemplo:
-Real Madrid -278 Empate +340 Getafe +900
-
-FORMATO 2 (6 líneas por partido):
-Línea 1: [Equipo Local]
-Línea 2: [Cuota Local]
-Línea 3: Empate
-Línea 4: [Cuota Empate]
-Línea 5: [Equipo Visitante]
-Línea 6: [Cuota Visitante]
-
-Ejemplo:
-Bournemouth
-+148
-Empate
-+260
-Brentford
-+164
-            """)
 
 if __name__ == "__main__":
     main()
