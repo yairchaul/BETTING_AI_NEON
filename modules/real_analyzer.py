@@ -1,6 +1,7 @@
 # modules/real_analyzer.py
 import numpy as np
 from .smart_searcher import SmartSearcher
+import streamlit as st
 
 class RealAnalyzer:
     def __init__(self):
@@ -10,9 +11,24 @@ class RealAnalyzer:
         """
         Analiza un partido basado en los últimos 5 partidos de cada equipo
         """
-        # Buscar equipos
-        home_team = self.searcher.find_team(home_name)
-        away_team = self.searcher.find_team(away_name)
+        # Buscar equipos con todas las APIs disponibles
+        with st.spinner(f"🔍 Buscando {home_name} en APIs..."):
+            home_team = self.searcher.find_team(home_name)
+        
+        with st.spinner(f"🔍 Buscando {away_name} en APIs..."):
+            away_team = self.searcher.find_team(away_name)
+        
+        # Mostrar resultados de búsqueda en debug
+        if st.session_state.get('debug_mode', False):
+            if home_team:
+                st.caption(f"✅ {home_name} → Encontrado como: {home_team['name']} (ID: {home_team['id']})")
+            else:
+                st.caption(f"❌ {home_name} → No encontrado en ninguna API")
+            
+            if away_team:
+                st.caption(f"✅ {away_name} → Encontrado como: {away_team['name']} (ID: {away_team['id']})")
+            else:
+                st.caption(f"❌ {away_name} → No encontrado en ninguna API")
         
         if not home_team or not away_team:
             return self._generate_generic_analysis(home_name, away_name)
@@ -46,35 +62,82 @@ class RealAnalyzer:
         """Calcula estadísticas de los últimos 5 partidos"""
         
         # Estadísticas locales
-        home_goals_for = [m['goals_home'] if m['home'] == home_matches[0]['home'] else m['goals_away'] 
-                         for m in home_matches]
-        home_goals_against = [m['goals_away'] if m['home'] == home_matches[0]['home'] else m['goals_home'] 
-                             for m in home_matches]
+        home_goals_for = []
+        home_goals_against = []
+        
+        for m in home_matches:
+            if m['home'] == home_matches[0]['home']:  # Es local
+                home_goals_for.append(m['goals_home'])
+                home_goals_against.append(m['goals_away'])
+            else:  # Es visitante
+                home_goals_for.append(m['goals_away'])
+                home_goals_against.append(m['goals_home'])
         
         # Estadísticas visitantes
-        away_goals_for = [m['goals_away'] if m['away'] == away_matches[0]['away'] else m['goals_home'] 
-                         for m in away_matches]
-        away_goals_against = [m['goals_home'] if m['away'] == away_matches[0]['away'] else m['goals_away'] 
-                             for m in away_matches]
+        away_goals_for = []
+        away_goals_against = []
+        
+        for m in away_matches:
+            if m['away'] == away_matches[0]['away']:  # Es visitante
+                away_goals_for.append(m['goals_away'])
+                away_goals_against.append(m['goals_home'])
+            else:  # Es local
+                away_goals_for.append(m['goals_home'])
+                away_goals_against.append(m['goals_away'])
         
         # Calcular promedios
-        avg_home_for = np.mean(home_goals_for)
-        avg_home_against = np.mean(home_goals_against)
-        avg_away_for = np.mean(away_goals_for)
-        avg_away_against = np.mean(away_goals_against)
+        avg_home_for = np.mean(home_goals_for) if home_goals_for else 1.2
+        avg_home_against = np.mean(home_goals_against) if home_goals_against else 1.2
+        avg_away_for = np.mean(away_goals_for) if away_goals_for else 1.1
+        avg_away_against = np.mean(away_goals_against) if away_goals_against else 1.1
         
         # BTTS en últimos partidos
-        home_btts = sum(1 for i in range(5) if home_goals_for[i] > 0 and home_goals_against[i] > 0) / 5
-        away_btts = sum(1 for i in range(5) if away_goals_for[i] > 0 and away_goals_against[i] > 0) / 5
+        home_btts = 0
+        for i in range(len(home_matches)):
+            if home_goals_for[i] > 0 and home_goals_against[i] > 0:
+                home_btts += 1
+        home_btts = home_btts / len(home_matches) if home_matches else 0.5
+        
+        away_btts = 0
+        for i in range(len(away_matches)):
+            if away_goals_for[i] > 0 and away_goals_against[i] > 0:
+                away_btts += 1
+        away_btts = away_btts / len(away_matches) if away_matches else 0.5
         
         # Over stats
-        home_over_1_5 = sum(1 for i in range(5) if (home_goals_for[i] + home_goals_against[i]) > 1.5) / 5
-        home_over_2_5 = sum(1 for i in range(5) if (home_goals_for[i] + home_goals_against[i]) > 2.5) / 5
-        home_over_3_5 = sum(1 for i in range(5) if (home_goals_for[i] + home_goals_against[i]) > 3.5) / 5
+        home_over_1_5 = 0
+        home_over_2_5 = 0
+        home_over_3_5 = 0
         
-        away_over_1_5 = sum(1 for i in range(5) if (away_goals_for[i] + away_goals_against[i]) > 1.5) / 5
-        away_over_2_5 = sum(1 for i in range(5) if (away_goals_for[i] + away_goals_against[i]) > 2.5) / 5
-        away_over_3_5 = sum(1 for i in range(5) if (away_goals_for[i] + away_goals_against[i]) > 3.5) / 5
+        for i in range(len(home_matches)):
+            total = home_goals_for[i] + home_goals_against[i]
+            if total > 1.5:
+                home_over_1_5 += 1
+            if total > 2.5:
+                home_over_2_5 += 1
+            if total > 3.5:
+                home_over_3_5 += 1
+        
+        home_over_1_5 = home_over_1_5 / len(home_matches) if home_matches else 0.7
+        home_over_2_5 = home_over_2_5 / len(home_matches) if home_matches else 0.5
+        home_over_3_5 = home_over_3_5 / len(home_matches) if home_matches else 0.3
+        
+        away_over_1_5 = 0
+        away_over_2_5 = 0
+        away_over_3_5 = 0
+        
+        for i in range(len(away_matches)):
+            total = away_goals_for[i] + away_goals_against[i]
+            if total > 1.5:
+                away_over_1_5 += 1
+            if total > 2.5:
+                away_over_2_5 += 1
+            if total > 3.5:
+                away_over_3_5 += 1
+        
+        away_over_1_5 = away_over_1_5 / len(away_matches) if away_matches else 0.65
+        away_over_2_5 = away_over_2_5 / len(away_matches) if away_matches else 0.45
+        away_over_3_5 = away_over_3_5 / len(away_matches) if away_matches else 0.25
         
         return {
             'home_goals_for': avg_home_for,
@@ -86,8 +149,8 @@ class RealAnalyzer:
             'over_1_5_prob': (home_over_1_5 + away_over_1_5) / 2,
             'over_2_5_prob': (home_over_2_5 + away_over_2_5) / 2,
             'over_3_5_prob': (home_over_3_5 + away_over_3_5) / 2,
-            'over_4_5_prob': (home_over_3_5 * 0.7 + away_over_3_5 * 0.7) / 2,  # Estimado
-            'over_5_5_prob': (home_over_3_5 * 0.3 + away_over_3_5 * 0.3) / 2,  # Estimado
+            'over_4_5_prob': (home_over_3_5 * 0.5 + away_over_3_5 * 0.5),  # Estimado
+            'over_5_5_prob': (home_over_3_5 * 0.2 + away_over_3_5 * 0.2),  # Estimado
         }
     
     def _generate_markets_from_stats(self, stats):
@@ -115,7 +178,7 @@ class RealAnalyzer:
             {'name': 'Ambos anotan (BTTS)', 'prob': stats['btts_prob'], 'category': 'BTTS'},
             {'name': 'No anotan ambos', 'prob': 1 - stats['btts_prob'], 'category': 'BTTS'},
             
-            # Primer tiempo (estimados)
+            # Primer tiempo (estimados basados en totales)
             {'name': 'Over 0.5 goles (1T)', 'prob': stats['over_1_5_prob'] * 0.7, 'category': 'Primer Tiempo'},
             {'name': 'Over 1.5 goles (1T)', 'prob': stats['over_2_5_prob'] * 0.4, 'category': 'Primer Tiempo'},
             {'name': 'Ambos anotan (1T)', 'prob': stats['btts_prob'] * 0.5, 'category': 'Primer Tiempo'},
