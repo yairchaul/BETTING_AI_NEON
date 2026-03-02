@@ -13,7 +13,7 @@ def init_components():
     return {
         'parser': ImageParser(),
         'analyzer': MatchAnalyzer(st.secrets.get("FOOTBALL_API_KEY", "")),
-        'tracker': BettingTracker()
+        'tracker': BettingTracker()  # Esto ahora maneja su propia inicialización
     }
 
 components = init_components()
