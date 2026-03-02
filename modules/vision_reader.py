@@ -34,90 +34,74 @@ class ImageParser:
             return []
 
     def smart_parse(self, text):
-        """Lógica mejorada para extraer equipos ignorando 'Empate' y otros ruidos"""
+        """
+        Interpreta la estructura de tabla de 3 columnas:
+        Col1: Equipos Locales
+        Col2: Cuotas Locales
+        Col3: Palabra "Empate"
+        Col4: Cuotas Empate
+        Col5: Equipos Visitantes
+        Col6: Cuotas Visitantes
+        """
         lines = text.split('\n')
-        matches = []
         
-        # 1. Extraer todas las odds primero
-        all_odds = re.findall(r'[+-]\d{3,4}', text)
+        # Clasificar líneas por su contenido
+        equipos_locales = []
+        cuotas_locales = []
+        empates = []
+        cuotas_empate = []
+        equipos_visitantes = []
+        cuotas_visitantes = []
         
-        # 2. Limpiar líneas y preparar para procesamiento
-        clean_lines = []
         for line in lines:
             line = line.strip()
             if not line:
                 continue
             
-            # Ignorar líneas que son solo odds
-            if re.match(r'^[+-]?\d+[.,]?\d*$', line):
-                continue
-            # Ignorar horas y fechas
-            if re.match(r'^\d{2}:\d{2}$', line):
-                continue
-            if re.match(r'^\d{1,2}\s+[A-Za-z]{3}', line):
-                continue
+            # Detectar si es un equipo (letras, sin números al inicio)
+            if re.match(r'^[A-Za-z]', line) and not re.search(r'[+-]\d', line):
+                if "Empate" not in line and len(line) > 2:
+                    # Determinar si es local o visitante basado en el contexto
+                    # Por ahora, los primeros 5 son locales, los últimos 5 son visitantes
+                    if len(equipos_locales) < 5:
+                        equipos_locales.append(line)
+                    else:
+                        equipos_visitantes.append(line)
             
-            # Limpiar caracteres especiales
-            line = re.sub(r'[|•\-_=+*]', ' ', line)
-            line = re.sub(r'\s+', ' ', line).strip()
+            # Detectar cuotas (+/- números)
+            elif re.match(r'[+-]\d{3,4}', line):
+                if len(cuotas_locales) < 5:
+                    cuotas_locales.append(line)
+                elif len(cuotas_empate) < 5:
+                    cuotas_empate.append(line)
+                else:
+                    cuotas_visitantes.append(line)
             
-            if len(line) > 2:
-                clean_lines.append(line)
+            # Detectar la palabra "Empate"
+            elif "Empate" in line:
+                empates.append(line)
         
-        # 3. Procesar las líneas para encontrar el patrón: EQUIPO - ODDS - EQUIPO
-        i = 0
-        odds_index = 0
+        # Debug para ver cómo se clasificó
+        st.write("**Clasificación de líneas:**")
+        st.write(f"Locales: {equipos_locales}")
+        st.write(f"Cuotas Locales: {cuotas_locales}")
+        st.write(f"Cuotas Empate: {cuotas_empate}")
+        st.write(f"Visitantes: {equipos_visitantes}")
+        st.write(f"Cuotas Visitantes: {cuotas_visitantes}")
         
-        while i < len(clean_lines) and odds_index + 2 < len(all_odds):
-            current_line = clean_lines[i]
-            
-            # Buscar si la línea actual parece un equipo (no contiene "Empate")
-            if self.is_team_name(current_line) and "empate" not in current_line.lower():
-                home = current_line
-                
-                # Las siguientes 3 odds son para este partido
-                odds = all_odds[odds_index:odds_index + 3]
-                odds_index += 3
-                
-                # Buscar el equipo visitante en las siguientes líneas
-                j = i + 1
-                away_found = None
-                
-                while j < len(clean_lines):
-                    next_line = clean_lines[j]
-                    # El visitante debe ser un nombre de equipo y no contener "Empate"
-                    if self.is_team_name(next_line) and "empate" not in next_line.lower():
-                        away_found = next_line
-                        break
-                    j += 1
-                
-                if away_found:
-                    matches.append({
-                        "home": self.fix_common_names(home),
-                        "away": self.fix_common_names(away_found),
-                        "all_odds": odds
-                    })
-                    i = j + 1  # Saltar hasta después del visitante
-                    continue
-            i += 1
-        
-        # 4. Si no encontró con el método anterior, intentar con patrón alternativo
-        if not matches:
-            # Buscar líneas que contengan odds y dos equipos
-            for line in clean_lines:
-                odds_in_line = re.findall(r'[+-]\d{3,4}', line)
-                if len(odds_in_line) >= 3:
-                    # Separar por espacios
-                    parts = line.split()
-                    # Filtrar partes que no sean odds y no sean "Empate"
-                    team_parts = [p for p in parts if not re.match(r'[+-]\d+', p) and p.lower() != "empate"]
-                    
-                    if len(team_parts) >= 2:
-                        matches.append({
-                            "home": self.fix_common_names(team_parts[0]),
-                            "away": self.fix_common_names(team_parts[-1]),
-                            "all_odds": odds_in_line[:3]
-                        })
+        # Construir matches
+        matches = []
+        for i in range(min(len(equipos_locales), len(equipos_visitantes))):
+            if i < len(cuotas_locales) and i < len(cuotas_empate) and i < len(cuotas_visitantes):
+                matches.append({
+                    "home": equipos_locales[i],
+                    "away": equipos_visitantes[i],
+                    "all_odds": [
+                        cuotas_locales[i],
+                        cuotas_empate[i],
+                        cuotas_visitantes[i]
+                    ]
+                })
         
         return matches
 
@@ -148,24 +132,18 @@ class ImageParser:
         
         # Correcciones comunes
         corrections = {
-            "Real": "Real Madrid",  # Esto debería ser más específico en producción
-            "Atleti": "Atletico Madrid",
-            "Barca": "Barcelona",
-            "PSG": "Paris Saint Germain",
-            "M'gladbach": "Borussia Monchengladbach",
-            "U. Berlin": "Union Berlin",
-            "Le Havre AC": "Le Havre"
+            "RCD Mallorca": "RCD Mallorca",
+            "Real Oviedo": "Real Oviedo",
+            "Getafe": "Getafe",
+            "Girona": "Girona",
+            "Real Madrid": "Real Madrid",
+            "Rayo Vallecano": "Rayo Vallecano",
+            "Celta de Vigo": "Celta de Vigo",
+            "Osasuna": "Osasuna",
+            "Levante": "Levante"
         }
         
-        # Solo aplicar corrección si el nombre exacto está en el diccionario
         return corrections.get(name, name)
-
-    def is_valid_team_pair(self, t1, t2):
-        """Valida que ambos sean nombres de equipo válidos"""
-        return (self.is_team_name(t1) and 
-                self.is_team_name(t2) and 
-                "empate" not in t1.lower() and 
-                "empate" not in t2.lower())
 
 
 # Función de respaldo para entrada manual
