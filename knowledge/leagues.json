@@ -1,0 +1,82 @@
+{
+  "France Ligue 1": {
+    "nivel": "ALTO",
+    "goles_promedio": 2.8,
+    "local_ventaja": 55,
+    "btts_pct": 52,
+    "top_equipos": ["PSG", "Marseille", "Monaco", "Lyon", "Lens", "Rennes", "Lille"],
+    "descripcion": "Liga top europea, muchos goles, PSG dominante"
+  },
+  "England Premier League": {
+    "nivel": "ALTO",
+    "goles_promedio": 2.9,
+    "local_ventaja": 48,
+    "btts_pct": 55,
+    "top_equipos": ["Manchester City", "Liverpool", "Arsenal", "Chelsea", "Tottenham", "Manchester United"],
+    "descripcion": "Liga más competitiva, cualquiera le gana a cualquiera"
+  },
+  "Spain LaLiga": {
+    "nivel": "ALTO",
+    "goles_promedio": 2.5,
+    "local_ventaja": 52,
+    "btts_pct": 48,
+    "top_equipos": ["Real Madrid", "Barcelona", "Atletico Madrid", "Real Sociedad", "Athletic Bilbao"],
+    "descripcion": "Más táctica, menos goles que Premier"
+  },
+  "Germany Bundesliga": {
+    "nivel": "ALTO",
+    "goles_promedio": 3.1,
+    "local_ventaja": 54,
+    "btts_pct": 58,
+    "top_equipos": ["Bayern Munich", "Dortmund", "Leverkusen", "RB Leipzig", "Wolfsburg"],
+    "descripcion": "Muchos goles, partidos abiertos"
+  },
+  "Italy Serie A": {
+    "nivel": "ALTO",
+    "goles_promedio": 2.6,
+    "local_ventaja": 51,
+    "btts_pct": 50,
+    "top_equipos": ["Juventus", "Inter", "Milan", "Napoli", "Roma", "Lazio"],
+    "descripcion": "Táctica, algo lenta, menos goles"
+  },
+  "Mexico Liga MX": {
+    "nivel": "MEDIO",
+    "goles_promedio": 2.7,
+    "local_ventaja": 58,
+    "btts_pct": 54,
+    "top_equipos": ["America", "Chivas", "Tigres", "Monterrey", "Cruz Azul", "Pumas"],
+    "descripcion": "Loca, cualquiera gana, muchos goles en casa"
+  },
+  "Argentina Liga Profesional": {
+    "nivel": "MEDIO",
+    "goles_promedio": 2.3,
+    "local_ventaja": 62,
+    "btts_pct": 45,
+    "top_equipos": ["Boca", "River", "Racing", "Independiente", "San Lorenzo"],
+    "descripcion": "Muy localista, pocos goles de visitante"
+  },
+  "Brazil Serie A": {
+    "nivel": "MEDIO",
+    "goles_promedio": 2.4,
+    "local_ventaja": 65,
+    "btts_pct": 48,
+    "top_equipos": ["Flamengo", "Palmeiras", "Corinthians", "Sao Paulo", "Santos"],
+    "descripcion": "Local muy fuerte, viajes largos afectan"
+  },
+  "Netherlands Eredivisie": {
+    "nivel": "MEDIO",
+    "goles_promedio": 3.2,
+    "local_ventaja": 58,
+    "btts_pct": 62,
+    "top_equipos": ["Ajax", "PSV", "Feyenoord", "AZ Alkmaar"],
+    "descripcion": "Muchísimos goles, partidos muy abiertos"
+  },
+  "Portugal Liga Nos": {
+    "nivel": "MEDIO",
+    "goles_promedio": 2.5,
+    "local_ventaja": 60,
+    "btts_pct": 48,
+    "top_equipos": ["Benfica", "Porto", "Sporting", "Braga"],
+    "descripcion": "Dominio de los 3 grandes, pocas sorpresas"
+  }
+}
