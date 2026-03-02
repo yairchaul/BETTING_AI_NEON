@@ -7,7 +7,20 @@ import unicodedata
 from difflib import SequenceMatcher
 import requests
 from PIL import Image
-import pytesseract
+# Comenta la línea 10
+# import easyocr
+
+# Y reemplaza la clase ImageParser con una versión simulada:
+class ImageParser:
+    def __init__(self):
+        pass
+    
+    def parse_image(self, uploaded_file):
+        # Versión de prueba que devuelve partidos manualmente
+        return [
+            {'local': 'FC Kyrgyzaltyn', 'visitante': 'Oshmu-Aldiyer', 'liga': 'Kyrgyzstan League'},
+            {'local': 'Rakhine United', 'visitante': 'Shan United', 'liga': 'Myanmar League'}
+        ], "texto simulado"
 import io
 import json
 from modules.cerebro import (
