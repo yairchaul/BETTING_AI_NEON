@@ -16,34 +16,97 @@ class UniversalParser:
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         
         # DEBUG: Mostrar líneas detectadas
-        st.write("Líneas detectadas por OCR:", lines)
+        st.write("📄 Líneas detectadas por OCR:", lines)
         
-        # ESTRATEGIA 1: Formato flexible de 8-10 líneas (tu imagen)
+        # ESTRATEGIA 1: Formato de 9 líneas (tu imagen actual)
+        matches = self._parse_nine_line_format(lines)
+        if matches:
+            return matches
+        
+        # ESTRATEGIA 2: Formato flexible de 8-10 líneas
         matches = self._parse_flexible_format(lines)
         if matches:
             return matches
         
-        # ESTRATEGIA 2: Formato de bloques humanos
+        # ESTRATEGIA 3: Formato de bloques humanos
         matches = self._parse_human_style(lines)
         if matches:
             return matches
         
-        # ESTRATEGIA 3: Formato de 6 líneas
+        # ESTRATEGIA 4: Formato de 6 líneas
         matches = self._parse_six_line_format(lines)
         if matches:
             return matches
         
-        # ESTRATEGIA 4: Formato de 1 línea (6 columnas)
+        # ESTRATEGIA 5: Formato de 1 línea (6 columnas)
         matches = self._parse_one_line_format(lines)
         if matches:
             return matches
         
-        # ESTRATEGIA 5: Formato de 2 líneas
+        # ESTRATEGIA 6: Formato de 2 líneas
         matches = self._parse_two_line_format(lines)
         if matches:
             return matches
         
         return []
+    
+    def _parse_nine_line_format(self, lines):
+        """
+        Formato específico de 9 líneas:
+        1: +XX (metadata)
+        2: Equipo Local
+        3: Equipo Visitante
+        4: Fecha
+        5: 1
+        6: 2
+        7: Cuota Local
+        8: Cuota Empate
+        9: Cuota Visitante
+        """
+        matches = []
+        i = 0
+        
+        while i < len(lines):
+            # Verificar si tenemos al menos 9 líneas para un bloque completo
+            if i + 8 < len(lines):
+                # Verificar si la línea actual es un número con signo
+                if re.match(r'^[+-]\d+$', lines[i]):
+                    local = lines[i+1]
+                    visitante = lines[i+2]
+                    fecha = lines[i+3]
+                    
+                    # Verificar las líneas 5 y 6 (deben ser "1" y "2")
+                    if lines[i+4] == '1' and lines[i+5] == '2':
+                        
+                        # Las líneas 7, 8, 9 son las cuotas
+                        cuota_local = lines[i+6]
+                        cuota_empate = lines[i+7]
+                        cuota_visitante = lines[i+8]
+                        
+                        # Validar que las cuotas tengan formato correcto
+                        if (re.match(r'^[+-]\d+$', cuota_local) and
+                            re.match(r'^[+-]\d+$', cuota_empate) and
+                            re.match(r'^[+-]\d+$', cuota_visitante)):
+                            
+                            # Limpiar nombres (quitar (W), (R), etc.)
+                            local_clean = re.sub(r'\s*\([^)]*\)', '', local).strip()
+                            visitante_clean = re.sub(r'\s*\([^)]*\)', '', visitante).strip()
+                            
+                            matches.append({
+                                'home': local_clean,
+                                'away': visitante_clean,
+                                'all_odds': [cuota_local, cuota_empate, cuota_visitante],
+                                'fecha': fecha,
+                                'metadata': lines[i]
+                            })
+                            
+                            # Saltar las 9 líneas procesadas
+                            i += 9
+                            continue
+            
+            i += 1
+        
+        return matches
     
     def _parse_flexible_format(self, lines):
         """
@@ -63,17 +126,13 @@ class UniversalParser:
         i = 0
         
         while i < len(lines):
-            # Buscar patrón: número con signo + 3 líneas + indicadores de cuotas
-            if i + 7 < len(lines):  # Mínimo 8 líneas (puede ser más si hay X)
-                # Verificar si la línea actual es un número con signo
+            if i + 7 < len(lines):
                 if re.match(r'^[+-]\d+$', lines[i]):
                     potencial_local = lines[i+1]
                     potencial_visitante = lines[i+2]
                     potencial_fecha = lines[i+3]
                     
-                    # Verificar las siguientes líneas (debe haber al menos "1" y "2")
                     offset = 4
-                    tiene_x = False
                     
                     # Verificar si la línea 4 es "1"
                     if i+offset < len(lines) and lines[i+offset] == '1':
@@ -81,28 +140,23 @@ class UniversalParser:
                         
                         # Verificar si la siguiente línea es "X" (opcional)
                         if i+offset < len(lines) and lines[i+offset] == 'X':
-                            tiene_x = True
                             offset += 1
                         
                         # Verificar si la siguiente línea es "2"
                         if i+offset < len(lines) and lines[i+offset] == '2':
                             offset += 1
                             
-                            # Las siguientes 3 líneas deberían ser las cuotas
                             if i+offset+2 < len(lines):
-                                cuota_local = lines[i+offset] if i+offset < len(lines) else 'N/A'
-                                cuota_empate = lines[i+offset+1] if i+offset+1 < len(lines) else 'N/A'
-                                cuota_visitante = lines[i+offset+2] if i+offset+2 < len(lines) else 'N/A'
+                                cuota_local = lines[i+offset]
+                                cuota_empate = lines[i+offset+1]
+                                cuota_visitante = lines[i+offset+2]
                                 
-                                # Validar que al menos las cuotas local y visitante tengan formato
                                 if (re.match(r'^[+-]\d+$', cuota_local) and
                                     re.match(r'^[+-]\d+$', cuota_visitante)):
                                     
-                                    # Si no hay cuota de empate, usar 'N/A'
                                     if not re.match(r'^[+-]\d+$', cuota_empate):
                                         cuota_empate = 'N/A'
                                     
-                                    # Limpiar nombres (quitar (W), (R), etc.)
                                     local_clean = re.sub(r'\s*\([^)]*\)', '', potencial_local).strip()
                                     visitante_clean = re.sub(r'\s*\([^)]*\)', '', potencial_visitante).strip()
                                     
@@ -110,11 +164,9 @@ class UniversalParser:
                                         'home': local_clean,
                                         'away': visitante_clean,
                                         'all_odds': [cuota_local, cuota_empate, cuota_visitante],
-                                        'fecha': potencial_fecha,
-                                        'metadata': lines[i]
+                                        'fecha': potencial_fecha
                                     })
                                     
-                                    # Saltamos todo el bloque (calculamos longitud real)
                                     i += offset + 3
                                     continue
             
@@ -141,7 +193,6 @@ class UniversalParser:
                     while j < len(lines) and cuotas_encontradas < 3:
                         linea = lines[j]
                         
-                        # Patrón "1 +125"
                         match_1 = re.match(r'^(\d)\s+([+-]\d+)$', linea)
                         if match_1:
                             odds.append(match_1.group(2))
@@ -149,7 +200,6 @@ class UniversalParser:
                             j += 1
                             continue
                         
-                        # Patrón "+125" suelto
                         match_2 = re.match(r'^[+-]\d+$', linea)
                         if match_2:
                             odds.append(linea)
@@ -157,14 +207,12 @@ class UniversalParser:
                             j += 1
                             continue
                         
-                        # Caso especial: 'A' o 'X'
                         if linea in ['A', 'X']:
                             odds.append('N/A')
                             cuotas_encontradas += 1
                             j += 1
                             continue
                         
-                        # Si no es cuota, dejamos de buscar
                         break
                     
                     if len(odds) >= 2:
@@ -174,7 +222,6 @@ class UniversalParser:
                         local_clean = re.sub(r'\s*\([^)]*\)', '', local).strip()
                         visitante_clean = re.sub(r'\s*\([^)]*\)', '', visitante).strip()
                         
-                        # Intentar obtener liga de la línea anterior
                         liga = "Desconocida"
                         if i > 0 and len(lines[i-1]) > 5:
                             liga = lines[i-1]
