@@ -101,11 +101,11 @@ def main():
         value_threshold = st.slider("Umbral de valor (edge mínimo)", 0.0, 0.2, 0.05, 0.01)
         
         use_ml = st.checkbox("🧠 Usar predicción ML", value=True)
-        use_ollama = st.checkbox("🤖 Usar IA local (Ollama)", value=False)
+        use_ollama = st.checkbox("🤖 Usar IA local (Ollama)", value=True)
         
         st.divider()
         
-        col_api1, col_api2, col_api3 = st.columns(3)
+        col_api1, col_api2 = st.columns(2)
         with col_api1:
             if st.secrets.get("FOOTBALL_API_KEY"):
                 st.success("⚽ API")
@@ -116,21 +116,11 @@ def main():
                 st.success("🤖 Groq OK")
             else:
                 st.warning("🤖 Groq No disponible")
-        with col_api3:
-            if st.secrets.get("ODDS_API_KEY"):
-                st.success("📊 Odds")
-            else:
-                st.warning("📊 No Odds")
-        
-        if components['ml_predictor'].is_trained:
-            st.success("🧠 ML: Entrenado")
-        else:
-            st.warning("🧠 ML: No entrenado")
         
         if components['ollama'].is_available:
             st.success("🤖 Ollama: Conectado")
         else:
-            st.warning("🤖 Ollama: No disponible (local)")
+            st.warning("🤖 Ollama: No disponible")
         
         debug_mode = st.checkbox("🔧 Modo debug", value=True)
         components['tracker'].show_tracker_ui()
@@ -222,14 +212,13 @@ def main():
                 with st.expander(f"📊 {home} vs {away}", expanded=i==0):
                     st.caption(f"🎲 Cuotas: Local {odds[0]} | Empate {odds[1]} | Visitante {odds[2]}")
                     
-                    # 1. ANÁLISIS CON REGLAS DE EXPERTO
                     analysis = components['analyzer'].analyze_match(home, away, odds)
                     
                     if analysis:
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
-                        # 2. PREDICCIÓN ML
+                        # PREDICCIÓN ML
                         if use_ml and components['ml_predictor'].is_trained:
                             with st.spinner("🧠 Prediciendo con ML..."):
                                 home_stats = {
@@ -266,7 +255,7 @@ def main():
                                                  f"{ml_pred['visitante']:.1%}",
                                                  f"{ml_pred['visitante'] - analysis['probabilidades'].get('visitante_gana', 0):.1%}")
                         
-                        # 3. ANÁLISIS CON OLLAMA (IA LOCAL)
+                        # ANÁLISIS CON OLLAMA (IA LOCAL)
                         if use_ollama and components['ollama'].is_available:
                             with st.spinner("🤖 Consultando IA local..."):
                                 ollama_analysis = components['ollama'].analyze_match(home, away)
@@ -274,7 +263,7 @@ def main():
                                     st.info("🤖 Análisis de IA Local:")
                                     st.json(ollama_analysis)
                         
-                        # 4. ODDS EN VIVO
+                        # ODDS EN VIVO
                         if check_live_odds:
                             fixture_id = components['odds'].get_fixture_id(home, away, liga)
                             if fixture_id:
@@ -293,7 +282,7 @@ def main():
                                             st.metric("Visitante", f"{live_odds['away']['value']}", 
                                                      live_odds['away']['bookmaker'][:15])
                         
-                        # 5. DETECTOR DE VALOR
+                        # DETECTOR DE VALOR
                         value_result = components['value_detector'].get_best_value_bet(analysis, match)
                         
                         if value_result:
@@ -332,7 +321,6 @@ def main():
                                 st.markdown(f"**{best.get('market', 'Over 1.5 goles')}** - {best.get('probability', 0.7):.1%}")
                                 st.markdown(f"📌 *{best.get('reason', 'Análisis contextual')}*")
                         
-                        # Mostrar mercados
                         markets_filtered = [
                             m for m in analysis.get('markets', []) 
                             if m.get('prob', 0) >= prob_minima and m.get('category', '') in categorias
@@ -347,7 +335,6 @@ def main():
                                 } for m in markets_filtered[:10]])
                                 st.dataframe(df_markets, use_container_width=True, hide_index=True)
                             
-                            # Preparar picks para el optimizador
                             for m in markets_filtered[:5]:
                                 odd_val = 1 / m['prob'] * 0.95
                                 all_picks_for_optimizer.append({
@@ -391,12 +378,11 @@ def main():
                             st.success("✅ Parlay registrado!")
                             st.rerun()
                 
-                # PARLAY OPTIMIZADO (FASE 6)
+                # PARLAY OPTIMIZADO
                 if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
                     st.divider()
                     st.subheader("🎯 Parlay Optimizado por Algoritmo Genético")
                     
-                    # Encontrar parlay óptimo
                     optimal = components['optimizer'].find_optimal_parlays(
                         all_picks_for_optimizer, 
                         max_size=max_parlay,
