@@ -15,11 +15,11 @@ class UniversalParser:
         """Método principal: detecta el formato y parsea"""
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         
-        # DEBUG: Mostrar líneas detectadas (opcional)
-        # st.write("Líneas detectadas:", lines)
+        # DEBUG: Mostrar líneas detectadas
+        st.write("Líneas detectadas por OCR:", lines)
         
-        # ESTRATEGIA 1: Formato de 10 líneas (tu imagen)
-        matches = self._parse_ten_line_format(lines)
+        # ESTRATEGIA 1: Formato flexible de 8-10 líneas (tu imagen)
+        matches = self._parse_flexible_format(lines)
         if matches:
             return matches
         
@@ -45,63 +45,78 @@ class UniversalParser:
         
         return []
     
-    def _parse_ten_line_format(self, lines):
+    def _parse_flexible_format(self, lines):
         """
-        Formato específico de tu imagen:
-        +90
-        Melbourne City
-        Buriram United
-        03 Mar 01:45
+        Formato flexible que acepta variaciones:
+        +16
+        Sheger Ketema (W)
+        Mechal SC (W)
+        03 Mar 01:00
         1
-        X
+        [X] (opcional)
         2
-        +125
-        +220
         +200
-        [basura opcional]
+        +180
+        +130
         """
         matches = []
         i = 0
         
         while i < len(lines):
-            # Buscar patrón: número con signo + 3 líneas + 3 cuotas
-            if i + 9 < len(lines):
+            # Buscar patrón: número con signo + 3 líneas + indicadores de cuotas
+            if i + 7 < len(lines):  # Mínimo 8 líneas (puede ser más si hay X)
                 # Verificar si la línea actual es un número con signo
                 if re.match(r'^[+-]\d+$', lines[i]):
                     potencial_local = lines[i+1]
                     potencial_visitante = lines[i+2]
                     potencial_fecha = lines[i+3]
                     
-                    # Verificar las siguientes 3 líneas (1, X, 2)
-                    if (lines[i+4] == '1' and 
-                        lines[i+5] == 'X' and 
-                        lines[i+6] == '2'):
+                    # Verificar las siguientes líneas (debe haber al menos "1" y "2")
+                    offset = 4
+                    tiene_x = False
+                    
+                    # Verificar si la línea 4 es "1"
+                    if i+offset < len(lines) and lines[i+offset] == '1':
+                        offset += 1
                         
-                        # Las siguientes 3 líneas deberían ser las cuotas
-                        cuota_local = lines[i+7] if i+7 < len(lines) else 'N/A'
-                        cuota_empate = lines[i+8] if i+8 < len(lines) else 'N/A'
-                        cuota_visitante = lines[i+9] if i+9 < len(lines) else 'N/A'
+                        # Verificar si la siguiente línea es "X" (opcional)
+                        if i+offset < len(lines) and lines[i+offset] == 'X':
+                            tiene_x = True
+                            offset += 1
                         
-                        # Validar que las cuotas tengan formato correcto
-                        if (re.match(r'^[+-]\d+$', cuota_local) and
-                            re.match(r'^[+-]\d+$', cuota_empate) and
-                            re.match(r'^[+-]\d+$', cuota_visitante)):
+                        # Verificar si la siguiente línea es "2"
+                        if i+offset < len(lines) and lines[i+offset] == '2':
+                            offset += 1
                             
-                            # Limpiar nombres (quitar (W), (R), etc.)
-                            local_clean = re.sub(r'\s*\([^)]*\)', '', potencial_local).strip()
-                            visitante_clean = re.sub(r'\s*\([^)]*\)', '', potencial_visitante).strip()
-                            
-                            matches.append({
-                                'home': local_clean,
-                                'away': visitante_clean,
-                                'all_odds': [cuota_local, cuota_empate, cuota_visitante],
-                                'fecha': potencial_fecha,
-                                'metadata': lines[i]
-                            })
-                            
-                            # Saltamos todo el bloque (10 líneas)
-                            i += 10
-                            continue
+                            # Las siguientes 3 líneas deberían ser las cuotas
+                            if i+offset+2 < len(lines):
+                                cuota_local = lines[i+offset] if i+offset < len(lines) else 'N/A'
+                                cuota_empate = lines[i+offset+1] if i+offset+1 < len(lines) else 'N/A'
+                                cuota_visitante = lines[i+offset+2] if i+offset+2 < len(lines) else 'N/A'
+                                
+                                # Validar que al menos las cuotas local y visitante tengan formato
+                                if (re.match(r'^[+-]\d+$', cuota_local) and
+                                    re.match(r'^[+-]\d+$', cuota_visitante)):
+                                    
+                                    # Si no hay cuota de empate, usar 'N/A'
+                                    if not re.match(r'^[+-]\d+$', cuota_empate):
+                                        cuota_empate = 'N/A'
+                                    
+                                    # Limpiar nombres (quitar (W), (R), etc.)
+                                    local_clean = re.sub(r'\s*\([^)]*\)', '', potencial_local).strip()
+                                    visitante_clean = re.sub(r'\s*\([^)]*\)', '', potencial_visitante).strip()
+                                    
+                                    matches.append({
+                                        'home': local_clean,
+                                        'away': visitante_clean,
+                                        'all_odds': [cuota_local, cuota_empate, cuota_visitante],
+                                        'fecha': potencial_fecha,
+                                        'metadata': lines[i]
+                                    })
+                                    
+                                    # Saltamos todo el bloque (calculamos longitud real)
+                                    i += offset + 3
+                                    continue
             
             i += 1
         
