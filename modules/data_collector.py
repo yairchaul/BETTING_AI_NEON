@@ -1,7 +1,6 @@
 # modules/data_collector.py
 import requests
 import streamlit as st
-from datetime import datetime, timedelta
 
 class DataCollector:
     """
@@ -23,7 +22,6 @@ class DataCollector:
         matches = []
         
         try:
-            # Obtener fixtures de la temporada
             url = f"https://v3.football.api-sports.io/fixtures?league={league_id}&season={season}"
             response = requests.get(url, headers=headers, timeout=10).json()
             
@@ -40,12 +38,6 @@ class DataCollector:
                         fixture['goals']['away'] or 0
                     )
                 }
-                
-                # Obtener estadísticas del partido (si están disponibles)
-                stats_url = f"https://v3.football.api-sports.io/fixtures/statistics?fixture={match['fixture_id']}"
-                stats_response = requests.get(stats_url, headers=headers, timeout=10).json()
-                
-                match['stats'] = self._extract_stats(stats_response)
                 matches.append(match)
             
             return matches
@@ -63,40 +55,20 @@ class DataCollector:
         else:
             return 2
     
-    def _extract_stats(self, stats_response):
-        """Extrae estadísticas relevantes del partido"""
-        stats = {
-            'home_possession': 50,
-            'away_possession': 50,
-            'home_shots': 0,
-            'away_shots': 0,
-            'home_shots_on_target': 0,
-            'away_shots_on_target': 0
-        }
+    def get_league_id(self, league_name):
+        """Obtiene el ID de una liga por su nombre"""
+        if not self.api_key:
+            return None
+        
+        headers = {'x-apisports-key': self.api_key}
         
         try:
-            for team_stats in stats_response.get('response', []):
-                is_home = team_stats['team']['name'] == 'home'
-                for stat in team_stats['statistics']:
-                    if stat['type'] == 'Ball Possession':
-                        value = int(stat['value'].replace('%', '')) if stat['value'] else 50
-                        if is_home:
-                            stats['home_possession'] = value
-                        else:
-                            stats['away_possession'] = value
-                    elif stat['type'] == 'Total Shots':
-                        value = int(stat['value']) if stat['value'] else 0
-                        if is_home:
-                            stats['home_shots'] = value
-                        else:
-                            stats['away_shots'] = value
-                    elif stat['type'] == 'Shots on Goal':
-                        value = int(stat['value']) if stat['value'] else 0
-                        if is_home:
-                            stats['home_shots_on_target'] = value
-                        else:
-                            stats['away_shots_on_target'] = value
+            url = f"https://v3.football.api-sports.io/leagues?search={league_name}"
+            response = requests.get(url, headers=headers, timeout=5).json()
+            
+            if response.get('results', 0) > 0:
+                return response['response'][0]['league']['id']
         except:
             pass
         
-        return stats
+        return None
