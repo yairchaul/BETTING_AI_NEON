@@ -49,7 +49,6 @@ def generar_parlay_pro(matches_analizados, max_selecciones=3):
         if match_name in partidos_usados:
             continue
             
-        # Priorizar mercados diferentes a Over 1.5
         mejores_opciones = sorted(markets, key=lambda x: x['prob'], reverse=True)
         
         seleccionado = None
@@ -65,11 +64,14 @@ def generar_parlay_pro(matches_analizados, max_selecciones=3):
             categorias_usadas.add(seleccionado.get('category', ''))
             partidos_usados.add(match_name)
             
+            # Intentar obtener cuota real si está disponible en el análisis
+            cuota_final = seleccionado.get('real_odd') or (1 / seleccionado['prob'] * 0.95)
+            
             selecciones.append({
                 'match': match_name,
                 'selection': seleccionado['name'],
                 'prob': seleccionado['prob'],
-                'odd': 1 / seleccionado['prob'] * 0.95,
+                'odd': cuota_final,
                 'confianza': seleccionado.get('confidence', 'MEDIA'),
                 'category': seleccionado.get('category', ''),
                 'razon': seleccionado.get('reason', '')
@@ -176,27 +178,23 @@ def main():
             st.divider()
             st.subheader("3. Análisis Profesional")
             
-            # ============================================================================
-            # INICIO: Preparar picks para optimizador
-            # ============================================================================
             all_picks_for_optimizer = []
             matches_analizados = []
             
             for i, match in enumerate(matches):
                 home = match.get('home', 'Unknown')
                 away = match.get('away', 'Unknown')
-                odds = match.get('all_odds', ['N/A', 'N/A', 'N/A'])
+                odds_raw = match.get('all_odds', ['N/A', 'N/A', 'N/A'])
                 
                 with st.expander(f"📊 {home} vs {away}", expanded=i==0):
-                    st.caption(f"🎲 Cuotas: Local {odds[0]} | Empate {odds[1]} | Visitante {odds[2]}")
+                    st.caption(f"🎲 Cuotas OCR: Local {odds_raw[0]} | Empate {odds_raw[1]} | Visitante {odds_raw[2]}")
                     
-                    analysis = components['analyzer'].analyze_match(home, away, odds)
+                    analysis = components['analyzer'].analyze_match(home, away, odds_raw)
                     
                     if analysis:
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
-                        # Análisis con Ollama
                         if use_ollama and components['ollama'].is_available:
                             with st.spinner("🤖 Consultando IA local..."):
                                 ollama_analysis = components['ollama'].analyze_match(home, away)
@@ -211,7 +209,7 @@ def main():
                                         st.metric("Visitante", f"{ollama_analysis.get('away_win_prob', 0):.1%}")
                                     st.caption(f"💡 {ollama_analysis.get('explanation', '')}")
                         
-                        # Detector de valor
+                        # Detector de valor (usa odds reales)
                         value_result = components['value_detector'].get_best_value_bet(analysis, match)
                         
                         if value_result:
@@ -233,44 +231,42 @@ def main():
                                     best = analysis.get('best_bet', {})
                                     st.markdown(f"### ✨ RECOMENDACIÓN")
                                     st.markdown(f"**{best.get('market', 'Over 1.5')}** - {best.get('probability', 0.7):.1%}")
-                                    st.markdown(f"📌 *{best.get('reason', 'Análisis contextual')}*")
                         
-                        # Preparar picks para el optimizador
+                        # PREPARAR PICKS PARA OPTIMIZADOR USANDO ODDS REALES
+                        # Mapeamos las cuotas del OCR a los mercados de análisis
+                        market_odds_map = {
+                            'Gana Local': odds_raw[0],
+                            'Empate': odds_raw[1],
+                            'Gana Visitante': odds_raw[2]
+                        }
+
                         markets_filtered = [
                             m for m in analysis.get('markets', []) 
                             if m.get('prob', 0) >= prob_minima and m.get('category', '') in categorias
                         ]
                         
-                        for m in markets_filtered[:3]:
-                            # Calcular EV para este pick
-                            pick_ev = 0
-                            if odds[0] != 'N/A' and 'local' in m['name'].lower():
-                                decimal_odd = components['value_detector'].american_to_decimal(odds[0])
-                                if decimal_odd:
-                                    pick_ev = (m['prob'] * decimal_odd) - 1
-                            elif odds[2] != 'N/A' and 'visitante' in m['name'].lower():
-                                decimal_odd = components['value_detector'].american_to_decimal(odds[2])
-                                if decimal_odd:
-                                    pick_ev = (m['prob'] * decimal_odd) - 1
+                        for m in markets_filtered:
+                            # 1. Obtener Cuota Real
+                            real_odd_str = market_odds_map.get(m['name'], 'N/A')
+                            v_data = components['value_detector'].detect_value(m['prob'], real_odd_str)
+                            
+                            # 2. Si hay cuota real en la imagen, usarla. Si no, usar estimación como fallback.
+                            final_odd = v_data['decimal_odd'] if v_data['decimal_odd'] else (1 / m['prob'] * 0.95)
+                            final_ev = v_data['ev'] if v_data['decimal_odd'] else 0
                             
                             all_picks_for_optimizer.append({
                                 'match': f"{analysis['home_team']} vs {analysis['away_team']}",
                                 'selection': m['name'],
                                 'prob': m['prob'],
-                                'odd': 1 / m['prob'] * 0.95,
-                                'ev': pick_ev,
+                                'odd': final_odd,
+                                'ev': final_ev,
                                 'category': m['category']
                             })
                         
                         matches_analizados.append(analysis)
             
-            # ============================================================================
-            # PARLAY TRADICIONAL Y OPTIMIZADO
-            # ============================================================================
             if matches_analizados:
                 st.divider()
-                
-                # PARLAY TRADICIONAL
                 st.subheader("🎯 Parlay Tradicional")
                 parlay = generar_parlay_pro(matches_analizados, max_parlay)
                 
@@ -288,20 +284,10 @@ def main():
                         for s in parlay['selecciones']:
                             conf_emoji = '🟢' if s['confianza'] == 'ALTA' else '🟡' if s['confianza'] == 'MEDIA' else '🔴'
                             st.markdown(f"{conf_emoji} **{s['match']}**: {s['selection']} ({s['prob']:.1%})")
-                        
-                        if st.button("📝 Registrar parlay tradicional"):
-                            components['tracker'].add_bet({
-                                'matches': [f"{s['match']}: {s['selection']}" for s in parlay['selecciones']],
-                                'total_odds': parlay['cuota_estimada'],
-                                'total_prob': parlay['probabilidad_total']
-                            }, stake=100)
-                            st.success("✅ Parlay registrado!")
-                            st.rerun()
                 
-                # PARLAY OPTIMIZADO (basado en EV)
                 if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
                     st.divider()
-                    st.subheader("🎯 Parlay Optimizado (Basado en EV)")
+                    st.subheader("🎯 Parlay Optimizado (Basado en EV Real)")
                     
                     optimal = components['optimizer'].find_optimal_parlays(
                         all_picks_for_optimizer, 
@@ -309,10 +295,10 @@ def main():
                         target_ev=value_threshold
                     )
                     
-                    if optimal and isinstance(optimal, dict) and 'picks' in optimal:
+                    if optimal:
                         prob_opt = np.prod([p['prob'] for p in optimal['picks']])
                         odds_opt = np.prod([p['odd'] for p in optimal['picks']])
-                        ev_opt = optimal.get('ev_combined', (prob_opt * odds_opt) - 1)
+                        ev_opt = (prob_opt * odds_opt) - 1
                         
                         with st.container(border=True):
                             col_o1, col_o2, col_o3 = st.columns(3)
@@ -323,27 +309,13 @@ def main():
                             with col_o3:
                                 st.metric("EV", f"{ev_opt:.2%}")
                             
-                            st.markdown("**Selecciones:**")
                             for p in optimal['picks']:
-                                ev_color = '🟢' if p.get('ev', 0) > value_threshold else '🟡'
-                                st.markdown(f"{ev_color} **{p['match']}**: {p['selection']} ({p['prob']:.1%}) [EV: {p.get('ev', 0):.2%}]")
-                            
-                            if st.button("📝 Registrar parlay optimizado"):
-                                components['tracker'].add_bet({
-                                    'matches': [f"{p['match']}: {p['selection']}" for p in optimal['picks']],
-                                    'total_odds': odds_opt,
-                                    'total_prob': prob_opt
-                                }, stake=100)
-                                st.success("✅ Parlay registrado!")
-                                st.rerun()
+                                ev_icon = '🔥' if p.get('ev', 0) > 0.05 else '✅'
+                                st.markdown(f"{ev_icon} **{p['match']}**: {p['selection']} (Odd: {p['odd']:.2f}) [EV: {p.get('ev', 0):.1%}]")
                     else:
-                        st.info("No se encontró un parlay con EV positivo")
-        
+                        st.info("No se encontraron combinaciones con EV positivo usando cuotas reales.")
         else:
             st.error("❌ No se detectaron partidos")
-            if raw_text:
-                st.code(raw_text)
-    
     else:
         st.info("👆 Sube una imagen para comenzar")
 
