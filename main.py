@@ -8,10 +8,6 @@ from modules.smart_searcher import SmartSearcher
 from modules.pro_analyzer_ultimate import ProAnalyzerUltimate
 from modules.odds_integrator import OddsIntegrator
 from modules.value_detector import ValueDetector
-from modules.ml_predictor import MLPredictor
-from modules.backtester import Backtester
-from modules.ollama_analyzer import OllamaAnalyzer
-from modules.parlay_optimizer import ParlayOptimizer
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
 
@@ -19,7 +15,7 @@ st.set_page_config(page_title="Analizador Profesional de Apuestas", layout="wide
 
 @st.cache_resource
 def init_components():
-    """Inicializa todos los componentes"""
+    """Inicializa componentes compatibles con la nube"""
     return {
         'vision': ImageParser(),
         'groq_vision': GroqVisionParser(),
@@ -29,10 +25,6 @@ def init_components():
         'odds': OddsIntegrator(),
         'tracker': BettingTracker(),
         'value_detector': ValueDetector(),
-        'ml_predictor': MLPredictor(),
-        'backtester': Backtester(),
-        'ollama': OllamaAnalyzer(),
-        'optimizer': ParlayOptimizer()
     }
 
 components = init_components()
@@ -100,9 +92,6 @@ def main():
         
         value_threshold = st.slider("Umbral de valor (edge mínimo)", 0.0, 0.2, 0.05, 0.01)
         
-        use_ml = st.checkbox("🧠 Usar predicción ML", value=True)
-        use_ollama = st.checkbox("🤖 Usar IA local (Ollama)", value=True)
-        
         st.divider()
         
         col_api1, col_api2 = st.columns(2)
@@ -116,11 +105,6 @@ def main():
                 st.success("🤖 Groq OK")
             else:
                 st.warning("🤖 Groq No disponible")
-        
-        if components['ollama'].is_available:
-            st.success("🤖 Ollama: Conectado")
-        else:
-            st.warning("🤖 Ollama: No disponible")
         
         debug_mode = st.checkbox("🔧 Modo debug", value=True)
         components['tracker'].show_tracker_ui()
@@ -140,7 +124,6 @@ def main():
             raw_text = ""
             metodo_usado = "Ninguno"
             
-            # INTENTO 1: Groq Vision
             if components['groq_vision'].is_available:
                 try:
                     matches = components['groq_vision'].extract_matches_with_vision(img_bytes)
@@ -151,7 +134,6 @@ def main():
                     if debug_mode:
                         st.warning(f"Groq Vision falló: {e}")
             
-            # INTENTO 2: Google Vision + Parser Universal
             if not matches:
                 try:
                     from google.cloud import vision
@@ -165,7 +147,6 @@ def main():
                 except Exception as e:
                     st.error(f"Error en OCR: {e}")
             
-            # INTENTO 3: Google Vision + Coordenadas
             if not matches and components['vision'].client:
                 try:
                     matches = components['vision'].process_image(img_bytes)
@@ -199,10 +180,9 @@ def main():
                     st.code(raw_text[:2000])
             
             st.divider()
-            st.subheader("3. Análisis Profesional Multi-Motor")
+            st.subheader("3. Análisis Profesional")
             
             matches_analizados = []
-            all_picks_for_optimizer = []
             
             for i, match in enumerate(matches):
                 home = match.get('home', 'Unknown')
@@ -218,52 +198,6 @@ def main():
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
-                        # PREDICCIÓN ML
-                        if use_ml and components['ml_predictor'].is_trained:
-                            with st.spinner("🧠 Prediciendo con ML..."):
-                                home_stats = {
-                                    'home_goals_for': 1.5, 'home_goals_against': 1.2,
-                                    'home_btts_pct': 50, 'home_wins_pct': 50
-                                }
-                                away_stats = {
-                                    'away_goals_for': 1.2, 'away_goals_against': 1.4,
-                                    'away_btts_pct': 48, 'away_wins_pct': 40
-                                }
-                                league_data = {
-                                    'goles_promedio': 2.5, 'local_ventaja': 55, 'btts_pct': 50
-                                }
-                                
-                                features = components['ml_predictor'].prepare_features(
-                                    home_stats, away_stats, league_data
-                                )
-                                
-                                ml_pred = components['ml_predictor'].predict(features)
-                                
-                                if ml_pred:
-                                    st.info("🧠 Predicción ML vs Experto:")
-                                    col_ml1, col_ml2, col_ml3 = st.columns(3)
-                                    with col_ml1:
-                                        st.metric("Local", 
-                                                 f"{ml_pred['local']:.1%}", 
-                                                 f"{ml_pred['local'] - analysis['probabilidades'].get('local_gana', 0):.1%}")
-                                    with col_ml2:
-                                        st.metric("Empate", 
-                                                 f"{ml_pred['empate']:.1%}",
-                                                 f"{ml_pred['empate'] - analysis['probabilidades'].get('empate', 0):.1%}")
-                                    with col_ml3:
-                                        st.metric("Visitante",
-                                                 f"{ml_pred['visitante']:.1%}",
-                                                 f"{ml_pred['visitante'] - analysis['probabilidades'].get('visitante_gana', 0):.1%}")
-                        
-                        # ANÁLISIS CON OLLAMA (IA LOCAL)
-                        if use_ollama and components['ollama'].is_available:
-                            with st.spinner("🤖 Consultando IA local..."):
-                                ollama_analysis = components['ollama'].analyze_match(home, away)
-                                if ollama_analysis:
-                                    st.info("🤖 Análisis de IA Local:")
-                                    st.json(ollama_analysis)
-                        
-                        # ODDS EN VIVO
                         if check_live_odds:
                             fixture_id = components['odds'].get_fixture_id(home, away, liga)
                             if fixture_id:
@@ -282,7 +216,6 @@ def main():
                                             st.metric("Visitante", f"{live_odds['away']['value']}", 
                                                      live_odds['away']['bookmaker'][:15])
                         
-                        # DETECTOR DE VALOR
                         value_result = components['value_detector'].get_best_value_bet(analysis, match)
                         
                         if value_result:
@@ -334,24 +267,13 @@ def main():
                                     'Tipo': m['category']
                                 } for m in markets_filtered[:10]])
                                 st.dataframe(df_markets, use_container_width=True, hide_index=True)
-                            
-                            for m in markets_filtered[:5]:
-                                odd_val = 1 / m['prob'] * 0.95
-                                all_picks_for_optimizer.append({
-                                    'match': f"{analysis['home_team']} vs {analysis['away_team']}",
-                                    'selection': m['name'],
-                                    'prob': m['prob'],
-                                    'odd': odd_val,
-                                    'category': m['category']
-                                })
                         
                         matches_analizados.append(analysis)
             
             if matches_analizados:
                 st.divider()
+                st.subheader("🎯 Parlay Recomendado")
                 
-                # PARLAY TRADICIONAL
-                st.subheader("🎯 Parlay Tradicional")
                 parlay = generar_parlay_pro(matches_analizados, max_parlay)
                 
                 if parlay:
@@ -369,7 +291,7 @@ def main():
                             conf_emoji = '🟢' if s['confianza'] == 'ALTA' else '🟡' if s['confianza'] == 'MEDIA' else '🔴'
                             st.markdown(f"{conf_emoji} **{s['match']}**: {s['selection']} ({s['prob']:.1%})")
                         
-                        if st.button("📝 Registrar parlay tradicional"):
+                        if st.button("📝 Registrar parlay"):
                             components['tracker'].add_bet({
                                 'matches': [f"{s['match']}: {s['selection']}" for s in parlay['selecciones']],
                                 'total_odds': parlay['cuota_estimada'],
@@ -377,43 +299,6 @@ def main():
                             }, stake=100)
                             st.success("✅ Parlay registrado!")
                             st.rerun()
-                
-                # PARLAY OPTIMIZADO
-                if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
-                    st.divider()
-                    st.subheader("🎯 Parlay Optimizado por Algoritmo Genético")
-                    
-                    optimal = components['optimizer'].find_optimal_parlays(
-                        all_picks_for_optimizer, 
-                        max_size=max_parlay,
-                        target_odds=3.0
-                    )
-                    
-                    if optimal:
-                        prob_opt = np.prod([p['prob'] for p in optimal])
-                        odds_opt = np.prod([p['odd'] for p in optimal])
-                        
-                        with st.container(border=True):
-                            col_o1, col_o2, col_o3 = st.columns(3)
-                            with col_o1:
-                                st.metric("Cuota", f"{odds_opt:.2f}")
-                            with col_o2:
-                                st.metric("Probabilidad", f"{prob_opt:.1%}")
-                            with col_o3:
-                                ev = (prob_opt * odds_opt) - 1
-                                st.metric("EV", f"{ev:.2%}")
-                            
-                            for p in optimal:
-                                st.markdown(f"• **{p['match']}**: {p['selection']} ({p['prob']:.1%})")
-                            
-                            if st.button("📝 Registrar parlay optimizado"):
-                                components['tracker'].add_bet({
-                                    'matches': [f"{p['match']}: {p['selection']}" for p in optimal],
-                                    'total_odds': odds_opt,
-                                    'total_prob': prob_opt
-                                }, stake=100)
-                                st.success("✅ Parlay registrado!")
-                                st.rerun()
         
         else:
             st.error("❌ No se detectaron partidos")
