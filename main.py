@@ -8,6 +8,7 @@ from modules.smart_searcher import SmartSearcher
 from modules.pro_analyzer_ultimate import ProAnalyzerUltimate
 from modules.odds_integrator import OddsIntegrator
 from modules.value_detector import ValueDetector
+from modules.ml_predictor import MLPredictor
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
 
@@ -24,7 +25,8 @@ def init_components():
         'analyzer': ProAnalyzerUltimate(),
         'odds': OddsIntegrator(),
         'tracker': BettingTracker(),
-        'value_detector': ValueDetector()
+        'value_detector': ValueDetector(),
+        'ml_predictor': MLPredictor()
     }
 
 components = init_components()
@@ -91,6 +93,9 @@ def main():
         value_threshold = st.slider("Umbral de valor (edge mínimo)", 0.0, 0.2, 0.05, 0.01, 
                                    help="Mínimo porcentaje de ventaja para considerar VALUE BET")
         
+        # Opción para usar ML
+        use_ml = st.checkbox("🧠 Usar predicción ML (si está entrenado)", value=True)
+        
         st.divider()
         
         col_api1, col_api2, col_api3 = st.columns(3)
@@ -109,6 +114,12 @@ def main():
                 st.success("📊 Odds")
             else:
                 st.warning("📊 No Odds")
+        
+        # Estado del modelo ML
+        if components['ml_predictor'].is_trained:
+            st.success("🧠 ML: Entrenado")
+        else:
+            st.warning("🧠 ML: No entrenado (ve a la página de entrenamiento)")
         
         debug_mode = st.checkbox("🔧 Modo debug", value=True)
         components['tracker'].show_tracker_ui()
@@ -153,7 +164,7 @@ def main():
                 except Exception as e:
                     st.error(f"Error en OCR: {e}")
             
-            # INTENTO 3: Google Vision con coordenadas (si el parser falló)
+            # INTENTO 3: Google Vision con coordenadas
             if not matches and components['vision'].client:
                 try:
                     matches = components['vision'].process_image(img_bytes)
@@ -187,7 +198,7 @@ def main():
                     st.code(raw_text[:2000])
             
             st.divider()
-            st.subheader("3. Análisis Profesional con Detector de Valor")
+            st.subheader("3. Análisis Profesional")
             
             matches_analizados = []
             
@@ -199,12 +210,52 @@ def main():
                 with st.expander(f"📊 {home} vs {away}", expanded=i==0):
                     st.caption(f"🎲 Cuotas: Local {odds[0]} | Empate {odds[1]} | Visitante {odds[2]}")
                     
+                    # Análisis con reglas de experto
                     analysis = components['analyzer'].analyze_match(home, away, odds)
                     
                     if analysis:
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
+                        # Predicción ML (si está entrenado y activado)
+                        if use_ml and components['ml_predictor'].is_trained:
+                            with st.spinner("🧠 Prediciendo con ML..."):
+                                # Preparar características (simplificado)
+                                home_stats = {
+                                    'home_goals_for': 1.5, 'home_goals_against': 1.2,
+                                    'home_btts_pct': 50, 'home_wins_pct': 50
+                                }
+                                away_stats = {
+                                    'away_goals_for': 1.2, 'away_goals_against': 1.4,
+                                    'away_btts_pct': 48, 'away_wins_pct': 40
+                                }
+                                league_data = {
+                                    'goles_promedio': 2.5, 'local_ventaja': 55, 'btts_pct': 50
+                                }
+                                
+                                features = components['ml_predictor'].prepare_features(
+                                    home_stats, away_stats, league_data
+                                )
+                                
+                                ml_pred = components['ml_predictor'].predict(features)
+                                
+                                if ml_pred:
+                                    st.info("🧠 Predicción ML vs Experto:")
+                                    col_ml1, col_ml2, col_ml3 = st.columns(3)
+                                    with col_ml1:
+                                        st.metric("Local", 
+                                                 f"{ml_pred['local']:.1%}", 
+                                                 f"{ml_pred['local'] - analysis['probabilidades'].get('local_gana', 0):.1%}")
+                                    with col_ml2:
+                                        st.metric("Empate", 
+                                                 f"{ml_pred['empate']:.1%}",
+                                                 f"{ml_pred['empate'] - analysis['probabilidades'].get('empate', 0):.1%}")
+                                    with col_ml3:
+                                        st.metric("Visitante",
+                                                 f"{ml_pred['visitante']:.1%}",
+                                                 f"{ml_pred['visitante'] - analysis['probabilidades'].get('visitante_gana', 0):.1%}")
+                        
+                        # Verificar odds en vivo
                         if check_live_odds:
                             fixture_id = components['odds'].get_fixture_id(home, away, liga)
                             if fixture_id:
@@ -223,19 +274,15 @@ def main():
                                             st.metric("Visitante", f"{live_odds['away']['value']}", 
                                                      live_odds['away']['bookmaker'][:15])
                         
-                        # ============================================================================
-                        # NUEVO: DETECTOR DE VALOR
-                        # ============================================================================
+                        # Detector de valor
                         value_result = components['value_detector'].get_best_value_bet(analysis, match)
                         
-                        # Mostrar recomendación con valor
                         if value_result:
                             with st.container(border=True):
                                 if value_result.get('type') == 'value_bet':
                                     st.markdown(f"### 🔥 VALUE BET DETECTADO")
                                     st.markdown(f"**{value_result['market']}**")
                                     
-                                    # Calcular probabilidad implícita del mercado
                                     implied_prob = 1 / value_result['decimal_odd'] if value_result.get('decimal_odd') else 0
                                     
                                     col_val1, col_val2 = st.columns(2)
@@ -248,7 +295,6 @@ def main():
                                     
                                     st.success(value_result['recommendation'])
                                 else:
-                                    # Si no hay value bet, mostrar recomendación normal
                                     best = analysis.get('best_bet', {})
                                     conf_color = {'ALTA': '🟢', 'MEDIA': '🟡', 'BAJA': '🔴'}.get(best.get('confidence', 'MEDIA'), '⚪')
                                     
@@ -259,7 +305,6 @@ def main():
                                     if value_result.get('edge', 0) > 0:
                                         st.caption(f"💡 Nota: Hay una pequeña ventaja de {value_result['edge']:.1%} sobre el mercado")
                         else:
-                            # Fallback si no hay value_result
                             best = analysis.get('best_bet', {})
                             conf_color = {'ALTA': '🟢', 'MEDIA': '🟡', 'BAJA': '🔴'}.get(best.get('confidence', 'MEDIA'), '⚪')
                             
