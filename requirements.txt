@@ -7,4 +7,4 @@ opencv-python-headless
 groq
 odds-api-io
 pandas
-model="llama-3.2-90b-vision-preview"
+llama-3.2-90b-vision-preview
