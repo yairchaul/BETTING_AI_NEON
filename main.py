@@ -283,7 +283,7 @@ def main():
                             st.success("✅ Parlay registrado!")
                             st.rerun()
                 
-              # PARLAY OPTIMIZADO (basado en EV)
+            # PARLAY OPTIMIZADO (basado en EV)
 if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
     st.divider()
     st.subheader("🎯 Parlay Optimizado (Basado en EV)")
