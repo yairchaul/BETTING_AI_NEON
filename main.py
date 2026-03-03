@@ -34,26 +34,41 @@ def init_components():
 components = init_components()
 
 def generar_parlay_pro(matches_analizados, max_selecciones=3):
-    """Genera parlay con las mejores opciones"""
+    """Genera parlay con las mejores opciones (diversificadas)"""
     if len(matches_analizados) < 2:
         return None
     
     selecciones = []
+    categorias_usadas = set()
+    
     for match in matches_analizados:
         best = match.get('best_bet', {})
         if best and best.get('probability', 0) > 0.55:
-            selecciones.append({
-                'match': f"{match.get('home_team', 'Unknown')} vs {match.get('away_team', 'Unknown')}",
-                'selection': best.get('market', 'Over 1.5 goles'),
-                'prob': best.get('probability', 0.7),
-                'odd': 1 / best.get('probability', 0.7) * 0.95,
-                'confianza': best.get('confidence', 'MEDIA'),
-                'category': best.get('category', ''),
-                'razon': best.get('reason', '')
-            })
-    
-    selecciones.sort(key=lambda x: x['prob'], reverse=True)
-    selecciones = selecciones[:max_selecciones]
+            market = best.get('market', 'Over 1.5 goles')
+            category = best.get('category', '')
+            
+            # Intentar diversificar por categoría
+            if len(selecciones) < max_selecciones:
+                # Si es Over 1.5 y ya tenemos muchos, buscar otra opción
+                if market == 'Over 1.5 goles' and len(categorias_usadas) >= 2:
+                    markets = match.get('markets', [])
+                    for m in markets[:3]:
+                        if m['name'] != 'Over 1.5 goles' and m['category'] not in categorias_usadas:
+                            best = m
+                            market = m['name']
+                            category = m['category']
+                            break
+                
+                categorias_usadas.add(category)
+                selecciones.append({
+                    'match': f"{match.get('home_team', 'Unknown')} vs {match.get('away_team', 'Unknown')}",
+                    'selection': market,
+                    'prob': best.get('probability', 0.7),
+                    'odd': 1 / best.get('probability', 0.7) * 0.95,
+                    'confianza': best.get('confidence', 'MEDIA'),
+                    'category': category,
+                    'razon': best.get('reason', '')
+                })
     
     if len(selecciones) >= 2:
         prob_total = np.prod([s['prob'] for s in selecciones])
@@ -94,10 +109,6 @@ def main():
         check_live_odds = st.checkbox("📡 Verificar odds en vivo", value=True)
         max_parlay = st.slider("Máximo selecciones por parlay", 2, 5, 3, 1)
         value_threshold = st.slider("Umbral de valor", 0.0, 0.2, 0.05, 0.01)
-        
-        # ============================================================================
-        # NUEVO: Opción para usar Ollama
-        # ============================================================================
         use_ollama = st.checkbox("🤖 Usar IA local (Ollama)", value=True)
         
         st.divider()
@@ -110,7 +121,7 @@ def main():
             if components['ollama'].is_available:
                 st.success("🤖 Ollama: Conectado")
             else:
-                st.warning("🤖 Ollama: No disponible (requiere PC local)")
+                st.warning("🤖 Ollama: No disponible")
         
         debug_mode = st.checkbox("🔧 Modo debug", value=True)
         components['tracker'].show_tracker_ui()
@@ -182,9 +193,7 @@ def main():
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
-                        # ============================================================================
-                        # NUEVO: Análisis con Ollama (IA local)
-                        # ============================================================================
+                        # Análisis con Ollama
                         if use_ollama and components['ollama'].is_available:
                             with st.spinner("🤖 Consultando IA local..."):
                                 ollama_analysis = components['ollama'].analyze_match(home, away)
@@ -199,23 +208,21 @@ def main():
                                         st.metric("Visitante", f"{ollama_analysis.get('away_win_prob', 0):.1%}")
                                     st.caption(f"💡 {ollama_analysis.get('explanation', '')}")
                         
-                        # DETECTOR DE VALOR
+                        # Detector de valor
                         value_result = components['value_detector'].get_best_value_bet(analysis, match)
                         
                         if value_result:
                             with st.container(border=True):
-                                if value_result.get('type') == 'value_bet':
+                                if value_result.get('type') == 'value_bet' and value_result.get('edge', 0) > value_threshold:
                                     st.markdown(f"### 🔥 VALUE BET DETECTADO")
                                     st.markdown(f"**{value_result['market']}**")
-                                    
-                                    implied_prob = 1 / value_result['decimal_odd'] if value_result.get('decimal_odd') else 0
                                     
                                     col_val1, col_val2 = st.columns(2)
                                     with col_val1:
                                         st.metric("Tu probabilidad", f"{value_result.get('implied_probability', 0):.1%}")
-                                        st.metric("Odds", f"{value_result['decimal_odd']:.2f}")
+                                        st.metric("Odds justas", f"{1/value_result['implied_probability']:.2f}")
                                     with col_val2:
-                                        st.metric("Prob. mercado", f"{implied_prob:.1%}")
+                                        st.metric("Odds mercado", f"{value_result['decimal_odd']:.2f}")
                                         st.metric("📈 EDGE", f"+{value_result['edge']:.1%}")
                                     
                                     st.success(value_result['recommendation'])
@@ -225,7 +232,7 @@ def main():
                                     st.markdown(f"**{best.get('market', 'Over 1.5')}** - {best.get('probability', 0.7):.1%}")
                                     st.markdown(f"📌 *{best.get('reason', 'Análisis contextual')}*")
                         
-                        # Preparar picks para el optimizador
+                        # Preparar picks para optimizador
                         markets_filtered = [
                             m for m in analysis.get('markets', []) 
                             if m.get('prob', 0) >= prob_minima and m.get('category', '') in categorias
