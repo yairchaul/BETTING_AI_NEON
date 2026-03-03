@@ -9,6 +9,7 @@ from modules.pro_analyzer_ultimate import ProAnalyzerUltimate
 from modules.odds_integrator import OddsIntegrator
 from modules.value_detector import ValueDetector
 from modules.ollama_analyzer import OllamaAnalyzer
+from modules.parlay_optimizer import ParlayOptimizer
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
 
@@ -27,6 +28,7 @@ def init_components():
         'tracker': BettingTracker(),
         'value_detector': ValueDetector(),
         'ollama': OllamaAnalyzer(),
+        'optimizer': ParlayOptimizer(),
     }
 
 components = init_components()
@@ -46,6 +48,7 @@ def generar_parlay_pro(matches_analizados, max_selecciones=3):
                 'prob': best.get('probability', 0.7),
                 'odd': 1 / best.get('probability', 0.7) * 0.95,
                 'confianza': best.get('confidence', 'MEDIA'),
+                'category': best.get('category', ''),
                 'razon': best.get('reason', '')
             })
     
@@ -91,6 +94,10 @@ def main():
         check_live_odds = st.checkbox("📡 Verificar odds en vivo", value=True)
         max_parlay = st.slider("Máximo selecciones por parlay", 2, 5, 3, 1)
         value_threshold = st.slider("Umbral de valor", 0.0, 0.2, 0.05, 0.01)
+        
+        # ============================================================================
+        # NUEVO: Opción para usar Ollama
+        # ============================================================================
         use_ollama = st.checkbox("🤖 Usar IA local (Ollama)", value=True)
         
         st.divider()
@@ -159,6 +166,7 @@ def main():
             st.subheader("3. Análisis Profesional")
             
             matches_analizados = []
+            all_picks_for_optimizer = []
             
             for i, match in enumerate(matches):
                 home = match.get('home', 'Unknown')
@@ -174,13 +182,22 @@ def main():
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
-                        # ANÁLISIS CON OLLAMA (si está disponible)
+                        # ============================================================================
+                        # NUEVO: Análisis con Ollama (IA local)
+                        # ============================================================================
                         if use_ollama and components['ollama'].is_available:
                             with st.spinner("🤖 Consultando IA local..."):
                                 ollama_analysis = components['ollama'].analyze_match(home, away)
                                 if ollama_analysis:
                                     st.info("🤖 Análisis de IA Local:")
-                                    st.json(ollama_analysis)
+                                    col_ollama1, col_ollama2, col_ollama3 = st.columns(3)
+                                    with col_ollama1:
+                                        st.metric("Local", f"{ollama_analysis.get('local_win_prob', 0):.1%}")
+                                    with col_ollama2:
+                                        st.metric("Empate", f"{ollama_analysis.get('draw_prob', 0):.1%}")
+                                    with col_ollama3:
+                                        st.metric("Visitante", f"{ollama_analysis.get('away_win_prob', 0):.1%}")
+                                    st.caption(f"💡 {ollama_analysis.get('explanation', '')}")
                         
                         # DETECTOR DE VALOR
                         value_result = components['value_detector'].get_best_value_bet(analysis, match)
@@ -208,12 +225,28 @@ def main():
                                     st.markdown(f"**{best.get('market', 'Over 1.5')}** - {best.get('probability', 0.7):.1%}")
                                     st.markdown(f"📌 *{best.get('reason', 'Análisis contextual')}*")
                         
+                        # Preparar picks para el optimizador
+                        markets_filtered = [
+                            m for m in analysis.get('markets', []) 
+                            if m.get('prob', 0) >= prob_minima and m.get('category', '') in categorias
+                        ]
+                        
+                        for m in markets_filtered[:3]:
+                            all_picks_for_optimizer.append({
+                                'match': f"{analysis['home_team']} vs {analysis['away_team']}",
+                                'selection': m['name'],
+                                'prob': m['prob'],
+                                'odd': 1 / m['prob'] * 0.95,
+                                'category': m['category']
+                            })
+                        
                         matches_analizados.append(analysis)
             
             if matches_analizados:
                 st.divider()
-                st.subheader("🎯 Parlay Recomendado")
                 
+                # PARLAY TRADICIONAL
+                st.subheader("🎯 Parlay Tradicional")
                 parlay = generar_parlay_pro(matches_analizados, max_parlay)
                 
                 if parlay:
@@ -231,7 +264,7 @@ def main():
                             conf_emoji = '🟢' if s['confianza'] == 'ALTA' else '🟡' if s['confianza'] == 'MEDIA' else '🔴'
                             st.markdown(f"{conf_emoji} **{s['match']}**: {s['selection']} ({s['prob']:.1%})")
                         
-                        if st.button("📝 Registrar parlay"):
+                        if st.button("📝 Registrar parlay tradicional"):
                             components['tracker'].add_bet({
                                 'matches': [f"{s['match']}: {s['selection']}" for s in parlay['selecciones']],
                                 'total_odds': parlay['cuota_estimada'],
@@ -239,6 +272,43 @@ def main():
                             }, stake=100)
                             st.success("✅ Parlay registrado!")
                             st.rerun()
+                
+                # PARLAY OPTIMIZADO
+                if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
+                    st.divider()
+                    st.subheader("🎯 Parlay Optimizado por Algoritmo Genético")
+                    
+                    optimal = components['optimizer'].find_optimal_parlays(
+                        all_picks_for_optimizer, 
+                        max_size=max_parlay,
+                        target_odds=3.0
+                    )
+                    
+                    if optimal:
+                        prob_opt = np.prod([p['prob'] for p in optimal])
+                        odds_opt = np.prod([p['odd'] for p in optimal])
+                        
+                        with st.container(border=True):
+                            col_o1, col_o2, col_o3 = st.columns(3)
+                            with col_o1:
+                                st.metric("Cuota", f"{odds_opt:.2f}")
+                            with col_o2:
+                                st.metric("Probabilidad", f"{prob_opt:.1%}")
+                            with col_o3:
+                                ev = (prob_opt * odds_opt) - 1
+                                st.metric("EV", f"{ev:.2%}")
+                            
+                            for p in optimal:
+                                st.markdown(f"• **{p['match']}**: {p['selection']} ({p['prob']:.1%})")
+                            
+                            if st.button("📝 Registrar parlay optimizado"):
+                                components['tracker'].add_bet({
+                                    'matches': [f"{p['match']}: {p['selection']}" for p in optimal],
+                                    'total_odds': odds_opt,
+                                    'total_prob': prob_opt
+                                }, stake=100)
+                                st.success("✅ Parlay registrado!")
+                                st.rerun()
         
         else:
             st.error("❌ No se detectaron partidos")
