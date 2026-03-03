@@ -45,54 +45,55 @@ class ValueDetector:
             return None
         return 1 / decimal_odd
     
-    def detect_value(self, our_probability, market_odds, threshold=0.05):
-        """
-        Detecta si hay valor (edge) positivo
-        threshold = 0.05 significa 5% de ventaja
-        """
-        if not market_odds or market_odds == 'N/A':
-            return {
-                'has_value': False,
-                'edge': 0,
-                'implied_probability': None,
-                'decimal_odd': None,
-                'recommendation': 'No hay odds de mercado para comparar'
-            }
-        
-        decimal_odd = self.american_to_decimal(market_odds)
-        if not decimal_odd:
-            return {
-                'has_value': False,
-                'edge': 0,
-                'implied_probability': None,
-                'decimal_odd': None,
-                'recommendation': 'No se pudo convertir la odd'
-            }
-        
-        # Probabilidad implícita del mercado (1 / odd)
-        implied_prob = self.calculate_implied_probability(decimal_odd)
-        
-        # Calcular edge (diferencia entre nuestra probabilidad y la del mercado)
-        edge = our_probability - implied_prob
-        
-        # Solo considerar VALUE si el edge es positivo y significativo
-        has_value = edge > threshold
-        
-        if has_value:
-            recommendation = f"🔥 VALUE BET! Ventaja de {edge:.1%}"
-        elif edge > 0:
-            recommendation = f"👍 Pequeña ventaja: {edge:.1%} (menor al umbral de {threshold:.1%})"
-        else:
-            recommendation = f"👎 Desventaja: {edge:.1%}"
-        
+   def detect_value(self, our_probability, market_odds, threshold=0.05):
+    """
+    Detecta si hay valor (edge) positivo
+    threshold = 0.05 significa 5% de ventaja
+    """
+    if not market_odds or market_odds == 'N/A':
         return {
-            'has_value': has_value,
-            'edge': edge,
-            'implied_probability': implied_prob,
-            'decimal_odd': decimal_odd,
-            'american_odd': market_odds,
-            'recommendation': recommendation
+            'has_value': False,
+            'edge': 0,
+            'implied_probability': None,
+            'decimal_odd': None,
+            'recommendation': 'No hay odds de mercado para comparar'
         }
+    
+    decimal_odd = self.american_to_decimal(market_odds)
+    if not decimal_odd:
+        return {
+            'has_value': False,
+            'edge': 0,
+            'implied_probability': None,
+            'decimal_odd': None,
+            'recommendation': 'No se pudo convertir la odd'
+        }
+    
+    # Probabilidad implícita del mercado (1 / odd)
+    implied_prob = self.calculate_implied_probability(decimal_odd)
+    
+    # CORRECCIÓN: El edge es la diferencia entre nuestra probabilidad y la del mercado
+    edge = our_probability - implied_prob
+    
+    # Solo considerar VALUE si el edge es positivo y significativo
+    has_value = edge > threshold
+    
+    # Mensaje según el edge
+    if has_value:
+        recommendation = f"🔥 VALUE BET! Ventaja de {edge:.1%}"
+    elif edge > 0:
+        recommendation = f"👍 Pequeña ventaja: {edge:.1%} (menor al umbral de {threshold:.1%})"
+    else:
+        recommendation = f"👎 Desventaja: {edge:.1%}"
+    
+    return {
+        'has_value': has_value,
+        'edge': edge,
+        'implied_probability': implied_prob,
+        'decimal_odd': decimal_odd,
+        'american_odd': market_odds,
+        'recommendation': recommendation
+    }
     
     def analyze_match_markets(self, match_analysis, match_odds):
         """
