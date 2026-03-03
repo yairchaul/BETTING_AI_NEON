@@ -15,57 +15,42 @@ class UniversalParser:
         """Método principal: detecta el formato y parsea"""
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         
+        # DEBUG: Mostrar líneas para verificar
+        # st.write("📄 Líneas:", lines)
+        
         matches = []
         
-        # ============================================================================
-        # ESTRATEGIA 1: Formato de 6 líneas (el de tu imagen)
-        # ============================================================================
-        six_line_matches = self._parse_six_line_format(lines)
-        matches.extend(six_line_matches)
+        # ESTRATEGIA 1: Formato de 5-6 líneas (el de tu imagen)
+        matches = self._parse_five_six_line_format(lines)
+        if matches:
+            return matches
         
-        # ============================================================================
         # ESTRATEGIA 2: Formato de lista vertical
-        # ============================================================================
-        vertical_matches = self._parse_vertical_list(lines)
-        matches.extend(vertical_matches)
+        matches = self._parse_vertical_list(lines)
+        if matches:
+            return matches
         
-        # ============================================================================
-        # ESTRATEGIA 3: Formato de 9 líneas
-        # ============================================================================
-        nine_line_matches = self._parse_nine_line_format(lines)
-        matches.extend(nine_line_matches)
+        # ESTRATEGIA 3: Formato de 1 línea (6 columnas)
+        matches = self._parse_one_line_format(lines)
+        if matches:
+            return matches
         
-        # ============================================================================
-        # ESTRATEGIA 4: Formato de 1 línea (6 columnas)
-        # ============================================================================
-        one_line_matches = self._parse_one_line_format(lines)
-        matches.extend(one_line_matches)
-        
-        # Eliminar duplicados
-        unique_matches = []
-        seen = set()
-        for match in matches:
-            key = (match.get('home', ''), match.get('away', ''))
-            if key not in seen:
-                seen.add(key)
-                unique_matches.append(match)
-        
-        return unique_matches
+        return []
     
-    def _parse_six_line_format(self, lines):
+    def _parse_five_six_line_format(self, lines):
         """
-        Formato de 6 líneas por partido (CORREGIDO):
+        Formato de 5-6 líneas por partido:
         Línea 1: Equipo Local
         Línea 2: Cuota Local + posible "Empate"
         Línea 3: Cuota Empate
         Línea 4: Equipo Visitante
         Línea 5: Cuota Visitante
-        Línea 6: (siguiente partido o vacío)
+        (Línea 6: puede ser el siguiente equipo o espacio)
         """
         matches = []
         i = 0
         
-        while i < len(lines) - 4:  # Necesitamos al menos 5 líneas para un partido
+        while i < len(lines) - 4:
             # Tomar las primeras 5 líneas como posible partido
             line1 = lines[i]      # Equipo Local
             line2 = lines[i+1]    # Cuota Local + posible "Empate"
@@ -73,7 +58,7 @@ class UniversalParser:
             line4 = lines[i+3]    # Equipo Visitante
             line5 = lines[i+4]    # Cuota Visitante
             
-            # Extraer cuota local de line2 (puede venir con "Empate")
+            # Extraer cuota local de line2
             local_odds = re.findall(r'[+-]\d{3,4}', line2)
             if not local_odds:
                 i += 1
@@ -90,10 +75,7 @@ class UniversalParser:
                 away = re.sub(r'[|•\-_=+*]', '', line4).strip()
                 
                 # Verificar que sean nombres válidos
-                if (len(home) > 2 and len(away) > 2 and
-                    home.lower() not in self.forbidden_words and
-                    away.lower() not in self.forbidden_words):
-                    
+                if (len(home) > 2 and len(away) > 2):
                     matches.append({
                         'home': home,
                         'away': away,
@@ -108,16 +90,14 @@ class UniversalParser:
         return matches
     
     def _parse_vertical_list(self, lines):
-        """Parsea formato de lista vertical (simplificado)"""
+        """Parsea formato de lista vertical"""
         matches = []
         
-        # Extraer todas las odds
         all_odds = []
         for line in lines:
             odds_in_line = re.findall(r'[+-]\d{3,4}', line)
             all_odds.extend(odds_in_line)
         
-        # Extraer nombres de equipos
         team_names = []
         for line in lines:
             if not re.search(r'[+-]\d{3,4}', line) and re.search(r'[A-Za-z]', line):
@@ -125,7 +105,6 @@ class UniversalParser:
                 if len(clean_name) > 3 and clean_name.lower() not in self.forbidden_words:
                     team_names.append(clean_name)
         
-        # Crear partidos en pares
         if len(team_names) >= 2:
             for i in range(0, len(team_names) - 1, 2):
                 if i + 1 < len(team_names):
@@ -141,27 +120,6 @@ class UniversalParser:
                             ]
                         })
         
-        return matches
-    
-    def _parse_nine_line_format(self, lines):
-        """Formato de 9 líneas por partido"""
-        matches = []
-        i = 0
-        while i < len(lines) - 8:
-            if re.match(r'^[+-]\d+$', lines[i]):
-                if lines[i+4] == '1' and lines[i+5] == '2':
-                    if (re.match(r'^[+-]\d+$', lines[i+6]) and
-                        re.match(r'^[+-]\d+$', lines[i+7]) and
-                        re.match(r'^[+-]\d+$', lines[i+8])):
-                        
-                        matches.append({
-                            'home': lines[i+1],
-                            'away': lines[i+2],
-                            'all_odds': [lines[i+6], lines[i+7], lines[i+8]]
-                        })
-                        i += 9
-                        continue
-            i += 1
         return matches
     
     def _parse_one_line_format(self, lines):
