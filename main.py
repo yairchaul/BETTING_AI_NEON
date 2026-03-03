@@ -116,14 +116,18 @@ def main():
             raw_text = ""
             metodo_usado = "Ninguno"
             
+            # ============================================================================
             # INTENTO 1: Groq Vision (si está disponible)
+            # ============================================================================
             if components['groq_vision'].is_available:
                 matches = components['groq_vision'].extract_matches_with_vision(img_bytes)
                 if matches:
                     metodo_usado = "Groq Vision AI"
                     st.success(f"✅ {metodo_usado}: {len(matches)} partidos")
             
+            # ============================================================================
             # INTENTO 2: Google Vision + Parser Universal
+            # ============================================================================
             if not matches:
                 try:
                     from google.cloud import vision
@@ -136,6 +140,18 @@ def main():
                         st.info(f"📝 {metodo_usado}: {len(matches)} partidos")
                 except Exception as e:
                     st.error(f"Error en OCR: {e}")
+            
+            # ============================================================================
+            # INTENTO 3: Google Vision con coordenadas (nuevo)
+            # ============================================================================
+            if not matches and components['vision'].client:
+                try:
+                    matches = components['vision'].process_image(img_bytes)
+                    metodo_usado = "Google Vision + Coordenadas"
+                    st.info(f"📐 {metodo_usado}: {len(matches)} partidos")
+                except Exception as e:
+                    if debug_mode:
+                        st.warning(f"Error en coordenadas: {e}")
         
         if matches:
             with col2:
@@ -248,4 +264,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
