@@ -283,50 +283,43 @@ def main():
                             st.success("✅ Parlay registrado!")
                             st.rerun()
                 
-                # PARLAY OPTIMIZADO
-                if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
-                    st.divider()
-                    st.subheader("🎯 Parlay Optimizado por Algoritmo Genético")
-                    
-                    optimal = components['optimizer'].find_optimal_parlays(
-                        all_picks_for_optimizer, 
-                        max_size=max_parlay,
-                        target_odds=3.0
-                    )
-                    
-                    if optimal:
-                        prob_opt = np.prod([p['prob'] for p in optimal])
-                        odds_opt = np.prod([p['odd'] for p in optimal])
-                        
-                        with st.container(border=True):
-                            col_o1, col_o2, col_o3 = st.columns(3)
-                            with col_o1:
-                                st.metric("Cuota", f"{odds_opt:.2f}")
-                            with col_o2:
-                                st.metric("Probabilidad", f"{prob_opt:.1%}")
-                            with col_o3:
-                                ev = (prob_opt * odds_opt) - 1
-                                st.metric("EV", f"{ev:.2%}")
-                            
-                            for p in optimal:
-                                st.markdown(f"• **{p['match']}**: {p['selection']} ({p['prob']:.1%})")
-                            
-                            if st.button("📝 Registrar parlay optimizado"):
-                                components['tracker'].add_bet({
-                                    'matches': [f"{p['match']}: {p['selection']}" for p in optimal],
-                                    'total_odds': odds_opt,
-                                    'total_prob': prob_opt
-                                }, stake=100)
-                                st.success("✅ Parlay registrado!")
-                                st.rerun()
-        
-        else:
-            st.error("❌ No se detectaron partidos")
-            if raw_text:
-                st.code(raw_text)
+              # PARLAY OPTIMIZADO (basado en EV)
+if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
+    st.divider()
+    st.subheader("🎯 Parlay Optimizado (Basado en EV)")
     
+    optimal = components['optimizer'].find_optimal_parlays(
+        all_picks_for_optimizer, 
+        max_size=max_parlay,
+        target_ev=value_threshold
+    )
+    
+    if optimal and isinstance(optimal, dict) and 'picks' in optimal:
+        prob_opt = np.prod([p['prob'] for p in optimal['picks']])
+        odds_opt = np.prod([p['odd'] for p in optimal['picks']])
+        ev_opt = optimal.get('ev_combined', (prob_opt * odds_opt) - 1)
+        
+        with st.container(border=True):
+            col_o1, col_o2, col_o3 = st.columns(3)
+            with col_o1:
+                st.metric("Cuota", f"{odds_opt:.2f}")
+            with col_o2:
+                st.metric("Probabilidad", f"{prob_opt:.1%}")
+            with col_o3:
+                st.metric("EV", f"{ev_opt:.2%}")
+            
+            st.markdown("**Selecciones:**")
+            for p in optimal['picks']:
+                ev_color = '🟢' if p.get('ev', 0) > value_threshold else '🟡'
+                st.markdown(f"{ev_color} **{p['match']}**: {p['selection']} ({p['prob']:.1%}) [EV: {p.get('ev', 0):.2%}]")
+            
+            if st.button("📝 Registrar parlay optimizado"):
+                components['tracker'].add_bet({
+                    'matches': [f"{p['match']}: {p['selection']}" for p in optimal['picks']],
+                    'total_odds': odds_opt,
+                    'total_prob': prob_opt
+                }, stake=100)
+                st.success("✅ Parlay registrado!")
+                st.rerun()
     else:
-        st.info("👆 Sube una imagen para comenzar")
-
-if __name__ == "__main__":
-    main()
+        st.info("No se encontró un parlay con EV positivo")
