@@ -89,14 +89,20 @@ def main():
         
         col_api1, col_api2, col_api3 = st.columns(3)
         with col_api1:
-            st.success("⚽ API") if st.secrets.get("FOOTBALL_API_KEY") else st.warning("⚽ No API")
+            if st.secrets.get("FOOTBALL_API_KEY"):
+                st.success("⚽ API")
+            else:
+                st.warning("⚽ No API")
         with col_api2:
             if components['groq_vision'].is_available:
                 st.success("🤖 Groq OK")
             else:
                 st.warning("🤖 Groq No disponible")
         with col_api3:
-            st.success("📊 Odds") if st.secrets.get("ODDS_API_KEY") else st.warning("📊 No Odds")
+            if st.secrets.get("ODDS_API_KEY"):
+                st.success("📊 Odds")
+            else:
+                st.warning("📊 No Odds")
         
         debug_mode = st.checkbox("🔧 Modo debug", value=True)
         components['tracker'].show_tracker_ui()
@@ -120,10 +126,14 @@ def main():
             # INTENTO 1: Groq Vision (si está disponible)
             # ============================================================================
             if components['groq_vision'].is_available:
-                matches = components['groq_vision'].extract_matches_with_vision(img_bytes)
-                if matches:
-                    metodo_usado = "Groq Vision AI"
-                    st.success(f"✅ {metodo_usado}: {len(matches)} partidos")
+                try:
+                    matches = components['groq_vision'].extract_matches_with_vision(img_bytes)
+                    if matches:
+                        metodo_usado = "Groq Vision AI"
+                        st.success(f"✅ {metodo_usado}: {len(matches)} partidos")
+                except Exception as e:
+                    if debug_mode:
+                        st.warning(f"Groq Vision falló: {e}")
             
             # ============================================================================
             # INTENTO 2: Google Vision + Parser Universal
@@ -142,7 +152,7 @@ def main():
                     st.error(f"Error en OCR: {e}")
             
             # ============================================================================
-            # INTENTO 3: Google Vision con coordenadas (nuevo)
+            # INTENTO 3: Google Vision con coordenadas (si el parser falló)
             # ============================================================================
             if not matches and components['vision'].client:
                 try:
@@ -174,7 +184,7 @@ def main():
             
             if debug_mode and raw_text:
                 with st.expander("🔬 Ver texto raw detectado"):
-                    st.code(raw_text[:1000])
+                    st.code(raw_text[:2000])
             
             st.divider()
             st.subheader("3. Análisis Profesional")
