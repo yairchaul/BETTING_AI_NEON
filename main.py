@@ -26,125 +26,112 @@ components = init_components()
 
 def parse_raw_betting_text(text):
     """
-    Versión para formato de 1 línea con 6 elementos:
-    [Local] [Cuota L] [Empate] [Cuota E] [Visitante] [Cuota V]
-    
-    Ejemplo de tu imagen:
-    Pacha -110 Empate +260 Necaxa +280
-    Santos Laguna +450 Empate +330 Cruz Azul -182
+    Versión para formato de 6 líneas por partido:
+    Línea 1: Equipo Local
+    Línea 2: Cuota Local
+    Línea 3: "Empate" (o variante)
+    Línea 4: Cuota Empate
+    Línea 5: Equipo Visitante
+    Línea 6: Cuota Visitante
     """
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     matches = []
     
-    # Palabras prohibidas para equipos
     forbidden_words = ['empate', 'empaté', 'draw', 'vs', 'v', 'local', 'visitante', 'cuota', 'odds']
     
-    # ============================================================================
-    # ESTRATEGIA PRINCIPAL: Formato de 6 elementos en una línea
-    # [Local] [Cuota L] [Empate] [Cuota E] [Visitante] [Cuota V]
-    # ============================================================================
-    # Patrón mejorado para capturar los 6 elementos
-    # Grupo 1: Equipo local (cualquier texto hasta encontrar un número con signo)
-    # Grupo 2: Cuota local ([+-] seguido de 3-4 dígitos)
-    # Grupo 3: Palabra "Empate" (con posibles variantes como "Empaite")
-    # Grupo 4: Cuota empate ([+-] seguido de 3-4 dígitos)
-    # Grupo 5: Equipo visitante (texto hasta el último número)
-    # Grupo 6: Cuota visitante ([+-] seguido de 3-4 dígitos al final)
-    pattern = r'^(.+?)\s+([+-]\d{3,4})\s+([Ee]mpat[ea]?[i]?[e]?)\s+([+-]\d{3,4})\s+(.+?)\s+([+-]\d{3,4})$'
-    
-    for line in lines:
-        # Intentar con el patrón principal de 6 elementos
-        match = re.match(pattern, line)
-        if match:
-            home = match.group(1).strip()
-            local_odd = match.group(2)
-            empate_word = match.group(3)
-            empate_odd = match.group(4)
-            away = match.group(5).strip()
-            away_odd = match.group(6)
-            
-            # Validar que el visitante no sea una palabra prohibida
-            if away.lower() not in forbidden_words and len(away) > 2:
-                matches.append({
-                    'home': home,
-                    'away': away,
-                    'all_odds': [local_odd, empate_odd, away_odd]
-                })
-                continue
+    # Formato de 6 líneas
+    i = 0
+    while i < len(lines) - 5:
+        potencial_home = lines[i]
+        potencial_home_odd = lines[i+1]
+        potencial_empate_word = lines[i+2]
+        potencial_empate_odd = lines[i+3]
+        potencial_away = lines[i+4]
+        potencial_away_odd = lines[i+5]
         
-        # Si el patrón de 6 falla, intentar con 5 elementos (por si falta la cuota visitante)
-        pattern5 = r'^(.+?)\s+([+-]\d{3,4})\s+([Ee]mpat[ea]?[i]?[e]?)\s+([+-]\d{3,4})\s+(.+?)$'
-        match5 = re.match(pattern5, line)
-        if match5:
-            home = match5.group(1).strip()
-            local_odd = match5.group(2)
-            empate_odd = match5.group(4)
-            away = match5.group(5).strip()
-            
-            if away.lower() not in forbidden_words and len(away) > 2:
-                matches.append({
-                    'home': home,
-                    'away': away,
-                    'all_odds': [local_odd, empate_odd, 'N/A']
-                })
-                continue
-        
-        # Si ambos patrones fallan, intentar extracción manual
-        odds_in_line = re.findall(r'[+-]\d{3,4}', line)
-        if len(odds_in_line) >= 2:
-            # Dividir la línea por los números
-            parts = re.split(r'[+-]\d{3,4}', line)
-            if len(parts) >= 3:
-                home_part = parts[0].strip()
-                # La parte entre el primer y segundo número contiene "Empate"
-                middle_part = parts[1].strip()
-                away_part = parts[2].strip() if len(parts) > 2 else ''
+        if ('empate' in potencial_empate_word.lower() or 'empaté' in potencial_empate_word.lower()):
+            if (re.match(r'^[+-]\d{3,4}$', potencial_home_odd) and
+                re.match(r'^[+-]\d{3,4}$', potencial_empate_odd) and
+                re.match(r'^[+-]\d{3,4}$', potencial_away_odd)):
                 
-                # Limpiar la parte del medio
-                middle_clean = re.sub(r'empate', '', middle_part, flags=re.IGNORECASE).strip()
-                
-                if home_part and away_part and len(home_part) > 2 and len(away_part) > 2:
-                    away_odd = odds_in_line[2] if len(odds_in_line) > 2 else 'N/A'
+                if (potencial_home.lower() not in forbidden_words and 
+                    potencial_away.lower() not in forbidden_words):
                     matches.append({
-                        'home': home_part,
-                        'away': away_part,
-                        'all_odds': [odds_in_line[0], odds_in_line[1], away_odd]
+                        'home': potencial_home,
+                        'away': potencial_away,
+                        'all_odds': [potencial_home_odd, potencial_empate_odd, potencial_away_odd]
                     })
+                    i += 6
+                    continue
+        i += 1
     
-    # ============================================================================
-    # ESTRATEGIA 2: Formato de 6 líneas (por si acaso)
-    # ============================================================================
-    if not matches:
-        i = 0
-        while i < len(lines) - 5:
-            potencial_home = lines[i]
-            potencial_home_odd = lines[i+1]
-            potencial_empate_word = lines[i+2]
-            potencial_empate_odd = lines[i+3]
-            potencial_away = lines[i+4]
-            potencial_away_odd = lines[i+5] if i+5 < len(lines) else ''
+    return matches
+
+def parse_complex_betting_text(text):
+    """
+    NUEVA FUNCIÓN: Para formato complejo de bloques:
+    [Liga]
+    [+número] (opcional)
+    [Equipo Local]
+    [Equipo Visitante]
+    [Fecha Hora]
+    [1] [+número] (cuota local)
+    [2] [+número] (cuota empate)
+    [3] [+número] (cuota visitante)
+    """
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    matches = []
+    
+    i = 0
+    while i < len(lines):
+        # Buscar patrón de bloque de partido
+        # La línea actual puede ser el nombre de la liga
+        liga = lines[i]
+        
+        # Verificar si la siguiente línea es un número con signo (opcional)
+        offset = 0
+        if i+1 < len(lines) and re.match(r'^[+-]\d+$', lines[i+1]):
+            offset = 1
+        
+        # Después de la liga (y posible número), deben venir dos líneas que son equipos
+        if i+offset+3 < len(lines):
+            potencial_home = lines[i+offset+0]
+            potencial_away = lines[i+offset+1]
+            fecha_hora = lines[i+offset+2]
             
-            if ('empate' in potencial_empate_word.lower() or 'empaté' in potencial_empate_word.lower()):
-                if (re.match(r'^[+-]\d{3,4}$', potencial_home_odd) and
-                    re.match(r'^[+-]\d{3,4}$', potencial_empate_odd)):
-                    
-                    if potencial_away.lower() not in forbidden_words and len(potencial_away) > 2:
-                        away_odd = potencial_away_odd if re.match(r'^[+-]\d{3,4}$', potencial_away_odd) else 'N/A'
-                        matches.append({
-                            'home': potencial_home,
-                            'away': potencial_away,
-                            'all_odds': [potencial_home_odd, potencial_empate_odd, away_odd]
-                        })
-                        i += 6
-                        continue
-            i += 1
+            # Buscar las cuotas en las siguientes líneas
+            odds = []
+            j = i+offset+3
+            while j < len(lines) and len(odds) < 3:
+                # Buscar patrón de "1 +XXX", "2 +XXX", "3 +XXX"
+                match = re.match(r'^(\d)\s+([+-]\d+)$', lines[j])
+                if match:
+                    odds.append(match.group(2))
+                j += 1
+            
+            # Si encontramos 3 cuotas, tenemos un partido
+            if len(odds) >= 3 and potencial_home and potencial_away:
+                # Limpiar nombres de equipos (quitar (W), (R), etc.)
+                home_clean = re.sub(r'\s*\([^)]*\)', '', potencial_home).strip()
+                away_clean = re.sub(r'\s*\([^)]*\)', '', potencial_away).strip()
+                
+                matches.append({
+                    'home': home_clean,
+                    'away': away_clean,
+                    'all_odds': odds[:3],
+                    'liga': liga,
+                    'fecha': fecha_hora
+                })
+                # Avanzar al siguiente bloque
+                i = j
+                continue
+        
+        i += 1
     
     return matches
 
 def generar_parlay_pro(matches_analizados, max_selecciones=3):
-    """
-    Genera parlay con las mejores opciones (limitado a max_selecciones)
-    """
+    """Genera parlay con las mejores opciones"""
     if len(matches_analizados) < 2:
         return None
     
@@ -189,7 +176,6 @@ def main():
     
     with st.sidebar:
         st.header("⚙️ Configuración")
-        
         prob_minima = st.slider("Probabilidad mínima", 0.0, 1.0, 0.55, 0.05)
         
         st.subheader("🎲 Mercados")
@@ -199,31 +185,18 @@ def main():
             default=["1X2", "Totales", "BTTS"]
         )
         
-        # Opción para verificar odds en vivo
         check_live_odds = st.checkbox("📡 Verificar odds en vivo", value=True)
-        
         max_parlay = st.slider("Máximo selecciones por parlay", 2, 5, 3, 1)
         
         st.divider()
         
         col_api1, col_api2, col_api3 = st.columns(3)
         with col_api1:
-            if st.secrets.get("FOOTBALL_API_KEY"):
-                st.success("⚽ API")
-            else:
-                st.warning("⚽ No API")
-        
+            st.success("⚽ API") if st.secrets.get("FOOTBALL_API_KEY") else st.warning("⚽ No API")
         with col_api2:
-            if st.secrets.get("GROQ_API_KEY"):
-                st.success("🤖 Groq")
-            else:
-                st.warning("🤖 No Groq")
-        
+            st.success("🤖 Groq") if st.secrets.get("GROQ_API_KEY") else st.warning("🤖 No Groq")
         with col_api3:
-            if st.secrets.get("ODDS_API_KEY"):
-                st.success("📊 Odds")
-            else:
-                st.warning("📊 No Odds")
+            st.success("📊 Odds") if st.secrets.get("ODDS_API_KEY") else st.warning("📊 No Odds")
         
         debug_mode = st.checkbox("🔧 Modo debug", value=True)
         components['tracker'].show_tracker_ui()
@@ -243,7 +216,7 @@ def main():
             raw_text = ""
             metodo_usado = "Ninguno"
             
-            # INTENTO 1: Groq Vision (si está disponible)
+            # INTENTO 1: Groq Vision
             if components['groq_vision']:
                 try:
                     matches = components['groq_vision'].extract_matches_with_vision(img_bytes)
@@ -254,7 +227,7 @@ def main():
                     if debug_mode:
                         st.warning(f"Groq Vision falló: {e}")
             
-            # INTENTO 2: OCR tradicional + parsing (formato de 1 línea con 6 elementos)
+            # INTENTO 2: OCR tradicional con múltiples formatos
             if not matches:
                 try:
                     from google.cloud import vision
@@ -262,8 +235,16 @@ def main():
                     response = components['vision'].client.text_detection(image=image)
                     if response.text_annotations:
                         raw_text = response.text_annotations[0].description
-                        matches = parse_raw_betting_text(raw_text)
-                        metodo_usado = "OCR + Parsing (6 elementos)"
+                        
+                        # Intentar formato complejo primero (nueva función)
+                        matches = parse_complex_betting_text(raw_text)
+                        if matches:
+                            metodo_usado = "OCR + Parsing (formato complejo)"
+                        else:
+                            # Si no, intentar formato estándar de 6 líneas
+                            matches = parse_raw_betting_text(raw_text)
+                            metodo_usado = "OCR + Parsing (6 líneas)"
+                        
                         st.info(f"📝 {metodo_usado}: {len(matches)} partidos")
                 except Exception as e:
                     st.error(f"Error en OCR: {e}")
@@ -300,8 +281,11 @@ def main():
                 home = match.get('home', 'Unknown')
                 away = match.get('away', 'Unknown')
                 odds = match.get('all_odds', ['N/A', 'N/A', 'N/A'])
+                liga_info = match.get('liga', '')
                 
                 with st.expander(f"📊 {home} vs {away}", expanded=i==0):
+                    if liga_info:
+                        st.caption(f"🏆 {liga_info}")
                     st.caption(f"🎲 Cuotas: Local {odds[0]} | Empate {odds[1]} | Visitante {odds[2]}")
                     
                     analysis = components['analyzer'].analyze_match(home, away, odds)
@@ -310,7 +294,6 @@ def main():
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
-                        # Verificar odds en vivo si está activado
                         if check_live_odds:
                             fixture_id = components['odds'].get_fixture_id(home, away, liga)
                             if fixture_id:
@@ -391,19 +374,18 @@ def main():
                                 'total_odds': parlay_pro['cuota_estimada'],
                                 'total_prob': parlay_pro['probabilidad_total']
                             }, stake=100)
-                            st.success("✅ Parlay registrado! Buena suerte!")
+                            st.success("✅ Parlay registrado!")
                             st.rerun()
                 else:
-                    st.info("No hay suficientes partidos con alta probabilidad para formar un parlay")
+                    st.info("No hay suficientes partidos con alta probabilidad")
         
         else:
-            st.error("❌ No se detectaron partidos en la imagen")
+            st.error("❌ No se detectaron partidos")
             if raw_text:
-                st.info("Texto detectado pero no se pudo parsear. Aquí está el texto raw:")
                 st.code(raw_text)
     
     else:
-        st.info("👆 Sube una imagen para comenzar el análisis profesional")
+        st.info("👆 Sube una imagen para comenzar")
 
 if __name__ == "__main__":
     main()
