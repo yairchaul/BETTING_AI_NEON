@@ -1,4 +1,3 @@
-# modules/vision_reader.py
 import re
 import streamlit as st
 from google.cloud import vision
@@ -28,7 +27,7 @@ class ImageParser:
             
             # Extraer cada palabra con sus coordenadas
             words_with_coords = []
-            for annotation in response.text_annotations[1:]:  # Saltar el primer elemento (todo el texto)
+            for annotation in response.text_annotations[1:]:  # Saltar el primer elemento
                 vertices = annotation.bounding_poly.vertices
                 if vertices:
                     # Calcular centro del bounding box
@@ -68,20 +67,44 @@ class ImageParser:
         for line in lines:
             text = ' '.join([w['text'] for w in line])
             
-            # Buscar odds
+            # Buscar cuotas (formato americano)
             odds = re.findall(r'[+-]\d{3,4}', text)
             
             if len(odds) >= 3:
-                # Limpiar texto
+                # Limpiar texto base
                 clean_text = re.sub(r'[+-]\d{3,4}', '', text).strip()
                 clean_text = re.sub(r'Empate', '', clean_text).strip()
+
+                # MEJORA: Dividir usando la posición física de las cuotas
+                first_odd_idx = -1
+                for i, w in enumerate(line):
+                    if w['text'] in odds:
+                        first_odd_idx = i
+                        break
                 
-                # Dividir en posibles equipos
-                parts = clean_text.split()
-                if len(parts) >= 2:
+                if first_odd_idx > 0:
+                    # Local: Todo el texto antes de la primera cuota
+                    home_name = ' '.join([w['text'] for w in line[:first_odd_idx]])
+                    
+                    try:
+                        # Buscamos "Empate" para separar al visitante
+                        empate_idx = next(i for i, w in enumerate(line) if "empate" in w['text'].lower())
+                        # Visitante: Texto después de la palabra "Empate" o su cuota
+                        away_parts = [w['text'] for w in line[empate_idx+1:] if w['text'] not in odds and w['text'].lower() != 'empate']
+                        away_name = ' '.join(away_parts)
+                    except StopIteration:
+                        # Fallback: si no hay palabra "Empate", usamos el split original
+                        parts = clean_text.split()
+                        home_name = parts[0] if parts else "Desconocido"
+                        away_name = parts[-1] if len(parts) > 1 else "Desconocido"
+
+                    if not away_name: # Si quedó vacío por la lógica de índices
+                        parts = clean_text.split()
+                        away_name = parts[-1] if len(parts) > 1 else "Desconocido"
+
                     matches.append({
-                        'home': parts[0],
-                        'away': parts[-1],
+                        'home': home_name,
+                        'away': away_name,
                         'all_odds': odds[:3]
                     })
         
