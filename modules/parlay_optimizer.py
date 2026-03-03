@@ -6,66 +6,89 @@ from itertools import combinations
 class ParlayOptimizer:
     """
     Optimizador de parlays usando algoritmos genéticos
-    Basado en teoría de portafolios y optimización combinatoria
+    Con validación estricta de picks duplicados
     """
     
     def __init__(self):
         self.generation = 0
     
-    def find_optimal_parlays(self, available_picks, max_size=3, target_odds=3.0, population_size=20):
+    def find_optimal_parlays(self, available_picks, max_size=3, target_ev=0.05, population_size=20):
         """
-        Encuentra parlays óptimos (versión simplificada y corregida)
+        Encuentra parlays óptimos basados en EV (Valor Esperado)
         """
         if len(available_picks) < 2:
             return []
+        
+        # Filtrar picks con EV positivo
+        value_picks = [p for p in available_picks if p.get('ev', 0) > target_ev]
+        
+        # Si no hay picks con EV, usar todos pero con advertencia
+        if not value_picks:
+            value_picks = available_picks
         
         best_parlays = []
         
         # Probar todas las combinaciones de tamaño 2 y 3
         for size in [2, 3]:
-            if size > len(available_picks) or size > max_size:
+            if size > len(value_picks) or size > max_size:
                 continue
                 
-            for combo in combinations(available_picks, size):
+            for combo in combinations(value_picks, size):
+                # Verificar que cada elemento sea un diccionario válido
+                valid_combo = True
+                for pick in combo:
+                    if not isinstance(pick, dict):
+                        valid_combo = False
+                        break
+                    if 'match' not in pick or 'prob' not in pick:
+                        valid_combo = False
+                        break
+                
+                if not valid_combo:
+                    continue
+                
                 # Verificar que no haya duplicados del mismo partido
                 matches = set()
-                valid = True
                 for pick in combo:
                     if pick['match'] in matches:
-                        valid = False
+                        valid_combo = False
                         break
                     matches.add(pick['match'])
                 
-                if not valid:
+                if not valid_combo:
                     continue
                 
                 # Calcular probabilidad y odds
                 prob_total = 1.0
                 odds_total = 1.0
+                ev_total = 0.0
+                
                 for pick in combo:
                     prob_total *= pick['prob']
                     odds_total *= pick.get('odd', 1/pick['prob'])
+                    ev_total += pick.get('ev', 0)
                 
-                # EV (Valor Esperado)
-                ev = (prob_total * odds_total) - 1
+                # EV combinado (aproximación)
+                ev_combined = (prob_total * odds_total) - 1
                 
                 best_parlays.append({
                     'picks': list(combo),
                     'prob': prob_total,
                     'odds': odds_total,
-                    'ev': ev,
+                    'ev_combined': ev_combined,
+                    'ev_sum': ev_total,
                     'size': size
                 })
         
-        # Ordenar por EV y eliminar duplicados
-        best_parlays.sort(key=lambda x: x['ev'], reverse=True)
+        # Ordenar por EV combinado
+        best_parlays.sort(key=lambda x: x['ev_combined'], reverse=True)
         
         # Eliminar parlays con probabilidad extremadamente baja
         best_parlays = [p for p in best_parlays if p['prob'] > 0.01]
         
         return best_parlays[0] if best_parlays else None
     
-    def find_best_combinations(self, picks, max_size=3, min_prob=0.55):
+    def find_best_combinations(self, picks, max_size=3, min_ev=0.05):
         """
         Encuentra las mejores combinaciones por fuerza bruta (para comparación)
         """
@@ -77,7 +100,7 @@ class ParlayOptimizer:
                 odds_total = np.prod([p.get('odd', 1/p['prob']) for p in combo])
                 ev = (prob_total * odds_total) - 1
                 
-                if prob_total >= min_prob ** size:
+                if ev >= min_ev:
                     best_combinations.append({
                         'picks': combo,
                         'prob': prob_total,
@@ -90,71 +113,26 @@ class ParlayOptimizer:
         best_combinations.sort(key=lambda x: x['ev'], reverse=True)
         return best_combinations[:10]
     
-    def _initialize_population(self, picks, max_size, size):
-        """Crea población inicial aleatoria"""
-        population = []
-        for _ in range(size):
-            n_picks = random.randint(2, max_size)
-            parlay = random.sample(picks, min(n_picks, len(picks)))
-            population.append(parlay)
-        return population
-    
-    def _calculate_fitness(self, parlay, target_odds):
-        """Calcula fitness de un parlay"""
-        if not parlay or len(parlay) < 2:
-            return 0
-        
-        prob_total = np.prod([p.get('prob', 0.5) for p in parlay])
-        odds_total = np.prod([p.get('odd', 2.0) for p in parlay])
-        ev = (prob_total * odds_total) - 1
-        
-        # Penalizar si es muy riesgoso
-        risk_penalty = 1 - (1 - prob_total) * 2
-        
-        # Bonus por diversificación
-        categories = [p.get('category', '') for p in parlay]
-        unique_cats = len(set(categories))
-        diversity_bonus = unique_cats / len(parlay) if parlay else 0
-        
-        fitness = ev * 0.6 + diversity_bonus * 0.4
-        return max(0, fitness * risk_penalty)
-    
-    def _tournament_selection(self, population, fitness_scores, tournament_size=3):
-        """Selección por torneo"""
-        selected = []
-        for _ in range(len(population)):
-            indices = random.sample(range(len(population)), min(tournament_size, len(population)))
-            best_idx = indices[0]
-            for idx in indices[1:]:
-                if fitness_scores[idx] > fitness_scores[best_idx]:
-                    best_idx = idx
-            selected.append(population[best_idx])
-        return selected
-    
-    def _crossover(self, parent1, parent2):
-        """Cruza dos padres para crear hijos"""
-        if len(parent1) < 2 or len(parent2) < 2:
-            return parent1, parent2
-        
-        point1 = random.randint(1, len(parent1)-1)
-        point2 = random.randint(1, len(parent2)-1)
-        
-        child1 = parent1[:point1] + parent2[point2:]
-        child2 = parent2[:point2] + parent1[point1:]
-        
-        return child1, child2
-    
     def _mutate(self, parlay, available_picks, mutation_rate=0.2):
-        """Muta un parlay"""
+        """Muta un parlay garantizando que no haya partidos duplicados"""
         if random.random() > mutation_rate:
             return parlay
         
-        if not parlay:
+        if not parlay or not available_picks:
             return parlay
+
+        # Elegir un índice al azar para cambiar
+        idx_to_replace = random.randint(0, len(parlay) - 1)
         
-        idx = random.randint(0, len(parlay)-1)
-        new_pick = random.choice(available_picks)
-        parlay[idx] = new_pick
+        # Identificar qué partidos YA están en el parlay (menos el que vamos a quitar)
+        current_matches = {p['match'] for i, p in enumerate(parlay) if i != idx_to_replace}
+        
+        # Filtrar picks disponibles que NO pertenezcan a los partidos actuales
+        valid_new_picks = [p for p in available_picks if p['match'] not in current_matches]
+        
+        if valid_new_picks:
+            # Reemplazar con un pick de un partido distinto
+            parlay[idx_to_replace] = random.choice(valid_new_picks)
         
         return parlay
     
