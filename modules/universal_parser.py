@@ -17,11 +17,14 @@ class UniversalParser:
         """
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         
+        # DEBUG: Mostrar líneas detectadas (solo si es necesario)
+        # st.write("Líneas detectadas:", lines)
+        
         # Intentar cada formato en orden de probabilidad
         parsers = [
             self._parse_format_c,  # 6 líneas (más común en capturas)
+            self._parse_format_d,  # Bloques complejos (como tu imagen)
             self._parse_format_a,  # 1 línea con 6 columnas
-            self._parse_format_d,  # Bloques complejos
             self._parse_format_b,  # 2 líneas
         ]
         
@@ -110,49 +113,59 @@ class UniversalParser:
         return matches
     
     def _parse_format_d(self, lines):
-        """Formato D: Bloques complejos"""
+        """Formato D: Bloques complejos (como tu imagen)"""
         matches = []
         i = 0
         while i < len(lines):
+            # Saltar números sueltos al inicio (como +90, +16, etc.)
+            if re.match(r'^[+-]\d+$', lines[i]) and i + 5 < len(lines):
+                i += 1
+                continue
+            
             # Buscar patrón de bloque
             if i + 4 < len(lines):
                 # Posible liga (puede tener números)
                 liga = lines[i]
                 
-                # Verificar si hay un número opcional después
-                offset = 0
-                if i+1 < len(lines) and re.match(r'^[+-]?\d+$', lines[i+1]):
-                    offset = 1
-                
                 # Buscar dos líneas que parezcan equipos
-                if i+offset+1 < len(lines) and i+offset+2 < len(lines):
-                    home_candidate = lines[i+offset]
-                    away_candidate = lines[i+offset+1]
+                if i+2 < len(lines):
+                    home_candidate = lines[i]
+                    away_candidate = lines[i+1]
+                    fecha_candidate = lines[i+2]
                     
                     # Buscar cuotas en las siguientes líneas
                     odds = []
-                    j = i+offset+3
+                    j = i+3
                     while j < len(lines) and len(odds) < 3:
+                        # Buscar patrón "1 +XXX" o "+XXX" suelto
                         match = re.match(r'^(\d)\s+([+-]\d+)$', lines[j])
                         if match:
                             odds.append(match.group(2))
+                        elif re.match(r'^[+-]\d+$', lines[j]) and len(odds) < 3:
+                            odds.append(lines[j])
                         j += 1
                     
-                    if len(odds) >= 3:
+                    if len(odds) >= 2:  # Al menos 2 odds (puede faltar una)
                         # Limpiar nombres
                         home_clean = re.sub(r'\s*\([^)]*\)', '', home_candidate).strip()
                         away_clean = re.sub(r'\s*\([^)]*\)', '', away_candidate).strip()
                         
                         if self._is_valid_team(home_clean) and self._is_valid_team(away_clean):
+                            # Completar odds si faltan
+                            while len(odds) < 3:
+                                odds.append('N/A')
+                            
                             matches.append({
                                 'home': home_clean,
                                 'away': away_clean,
                                 'all_odds': odds[:3],
-                                'liga': liga
+                                'liga': liga,
+                                'fecha': fecha_candidate
                             })
                         i = j
                         continue
             i += 1
+        
         return matches
     
     def _is_valid_team(self, name):
