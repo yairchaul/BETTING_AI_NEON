@@ -8,6 +8,7 @@ from modules.smart_searcher import SmartSearcher
 from modules.pro_analyzer_ultimate import ProAnalyzerUltimate
 from modules.odds_integrator import OddsIntegrator
 from modules.value_detector import ValueDetector
+from modules.ollama_analyzer import OllamaAnalyzer
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
 
@@ -15,7 +16,7 @@ st.set_page_config(page_title="Analizador Profesional de Apuestas", layout="wide
 
 @st.cache_resource
 def init_components():
-    """Inicializa componentes"""
+    """Inicializa todos los componentes"""
     return {
         'vision': ImageParser(),
         'groq_vision': GroqVisionParser(),
@@ -25,6 +26,7 @@ def init_components():
         'odds': OddsIntegrator(),
         'tracker': BettingTracker(),
         'value_detector': ValueDetector(),
+        'ollama': OllamaAnalyzer(),
     }
 
 components = init_components()
@@ -88,19 +90,20 @@ def main():
         
         check_live_odds = st.checkbox("📡 Verificar odds en vivo", value=True)
         max_parlay = st.slider("Máximo selecciones por parlay", 2, 5, 3, 1)
-        
         value_threshold = st.slider("Umbral de valor", 0.0, 0.2, 0.05, 0.01)
+        use_ollama = st.checkbox("🤖 Usar IA local (Ollama)", value=True)
         
         st.divider()
         
-        # Estado de APIs (sin mensajes de Groq)
         col_api1, col_api2 = st.columns(2)
         with col_api1:
             if st.secrets.get("FOOTBALL_API_KEY"):
                 st.success("⚽ API")
         with col_api2:
-            # No mostrar nada sobre Groq si no está disponible
-            pass
+            if components['ollama'].is_available:
+                st.success("🤖 Ollama: Conectado")
+            else:
+                st.warning("🤖 Ollama: No disponible (requiere PC local)")
         
         debug_mode = st.checkbox("🔧 Modo debug", value=True)
         components['tracker'].show_tracker_ui()
@@ -119,7 +122,6 @@ def main():
             matches = []
             raw_text = ""
             
-            # SOLO USAR GOOGLE VISION + PARSER UNIVERSAL
             try:
                 from google.cloud import vision
                 image = vision.Image(content=img_bytes)
@@ -136,7 +138,7 @@ def main():
                 st.subheader(f"2. Partidos detectados ({len(matches)})")
                 
                 df_view = []
-                for m in matches[:8]:
+                for m in matches:
                     odds = m.get('all_odds', ['N/A', 'N/A', 'N/A'])
                     df_view.append({
                         'LOCAL': m.get('home', 'N/A')[:20],
@@ -147,8 +149,7 @@ def main():
                         'CUOTA V': odds[2]
                     })
                 
-                if df_view:
-                    st.dataframe(pd.DataFrame(df_view), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(df_view), use_container_width=True, hide_index=True)
             
             if debug_mode and raw_text:
                 with st.expander("🔬 Ver texto raw detectado"):
@@ -173,7 +174,15 @@ def main():
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
                         
-                        # Detector de valor
+                        # ANÁLISIS CON OLLAMA (si está disponible)
+                        if use_ollama and components['ollama'].is_available:
+                            with st.spinner("🤖 Consultando IA local..."):
+                                ollama_analysis = components['ollama'].analyze_match(home, away)
+                                if ollama_analysis:
+                                    st.info("🤖 Análisis de IA Local:")
+                                    st.json(ollama_analysis)
+                        
+                        # DETECTOR DE VALOR
                         value_result = components['value_detector'].get_best_value_bet(analysis, match)
                         
                         if value_result:
