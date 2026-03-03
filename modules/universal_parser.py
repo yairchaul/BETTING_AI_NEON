@@ -4,26 +4,25 @@ import streamlit as st
 
 class UniversalParser:
     """
-    Parser universal que detecta automáticamente el formato de la imagen
-    y extrae los partidos correctamente.
+    Parser universal que imita el razonamiento humano para detectar
+    partidos en cualquier formato de imagen.
     """
     
     def __init__(self):
         self.forbidden_words = ['empate', 'empaté', 'draw', 'vs', 'v', 'local', 'visitante', 'cuota', 'odds']
     
     def parse(self, text):
-        """
-        Método principal: detecta el formato y parsea
-        """
+        """Método principal: imita el proceso mental humano"""
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         
-        # DEBUG: Mostrar líneas detectadas (solo si es necesario)
-        # st.write("Líneas detectadas:", lines)
+        # Un humano primero intentaría ver si hay bloques con números especiales
+        matches = self._parse_human_style(lines)
+        if matches:
+            return matches
         
-        # Intentar cada formato en orden de probabilidad
+        # Si no, prueba los formatos estándar
         parsers = [
-            self._parse_format_c,  # 6 líneas (más común en capturas)
-            self._parse_format_d,  # Bloques complejos (como tu imagen)
+            self._parse_format_c,  # 6 líneas
             self._parse_format_a,  # 1 línea con 6 columnas
             self._parse_format_b,  # 2 líneas
         ]
@@ -34,6 +33,92 @@ class UniversalParser:
                 return matches
         
         return []
+    
+    def _parse_human_style(self, lines):
+        """
+        Imita exactamente cómo un humano analizaría la imagen:
+        - Busca bloques que empiezan con un número con signo (+90, +14, etc.)
+        - Cada bloque tiene estructura fija
+        """
+        matches = []
+        i = 0
+        
+        while i < len(lines):
+            # Un humano detecta un nuevo bloque cuando ve un número con signo
+            if re.match(r'^[+-]\d+$', lines[i]):
+                
+                # Verificar que hay suficientes líneas para un bloque completo
+                if i + 3 < len(lines):
+                    codigo = lines[i]      # Metadata (lo ignoramos)
+                    local = lines[i+1]
+                    visitante = lines[i+2]
+                    fecha = lines[i+3]
+                    
+                    # Un humano sabe que después de la fecha vienen las cuotas
+                    odds = []
+                    j = i + 4
+                    
+                    # Buscar las próximas 3 líneas que sean cuotas
+                    cuotas_encontradas = 0
+                    while j < len(lines) and cuotas_encontradas < 3:
+                        linea = lines[j]
+                        
+                        # Patrón "1 +125"
+                        match_1 = re.match(r'^(\d)\s+([+-]\d+)$', linea)
+                        if match_1:
+                            odds.append(match_1.group(2))
+                            cuotas_encontradas += 1
+                            j += 1
+                            continue
+                        
+                        # Patrón "+125" suelto
+                        match_2 = re.match(r'^[+-]\d+$', linea)
+                        if match_2 and cuotas_encontradas < 3:
+                            odds.append(linea)
+                            cuotas_encontradas += 1
+                            j += 1
+                            continue
+                        
+                        # Caso especial: "A" (sin cuota)
+                        if linea == 'A' and cuotas_encontradas < 3:
+                            odds.append('N/A')
+                            cuotas_encontradas += 1
+                            j += 1
+                            continue
+                        
+                        # Si no es una cuota, dejamos de buscar
+                        break
+                    
+                    # Si encontramos al menos 2 cuotas, es un bloque válido
+                    if len(odds) >= 2:
+                        # Completar con N/A si faltan
+                        while len(odds) < 3:
+                            odds.append('N/A')
+                        
+                        # Limpiar nombres (quitar (W), (R), etc.)
+                        local_clean = re.sub(r'\s*\([^)]*\)', '', local).strip()
+                        visitante_clean = re.sub(r'\s*\([^)]*\)', '', visitante).strip()
+                        
+                        # Inferir liga del contexto (línea anterior al bloque)
+                        liga = "Desconocida"
+                        if i > 0 and len(lines[i-1]) > 5:
+                            liga = lines[i-1]
+                        
+                        matches.append({
+                            'home': local_clean,
+                            'away': visitante_clean,
+                            'all_odds': odds[:3],
+                            'liga': liga,
+                            'fecha': fecha
+                        })
+                        
+                        # Saltar al siguiente bloque
+                        i = j
+                        continue
+            
+            i += 1
+        
+        return matches
     
     def _parse_format_a(self, lines):
         """Formato A: 1 línea con 6 elementos"""
@@ -110,62 +195,6 @@ class UniversalParser:
                         i += 6
                         continue
             i += 1
-        return matches
-    
-    def _parse_format_d(self, lines):
-        """Formato D: Bloques complejos (como tu imagen)"""
-        matches = []
-        i = 0
-        while i < len(lines):
-            # Saltar números sueltos al inicio (como +90, +16, etc.)
-            if re.match(r'^[+-]\d+$', lines[i]) and i + 5 < len(lines):
-                i += 1
-                continue
-            
-            # Buscar patrón de bloque
-            if i + 4 < len(lines):
-                # Posible liga (puede tener números)
-                liga = lines[i]
-                
-                # Buscar dos líneas que parezcan equipos
-                if i+2 < len(lines):
-                    home_candidate = lines[i]
-                    away_candidate = lines[i+1]
-                    fecha_candidate = lines[i+2]
-                    
-                    # Buscar cuotas en las siguientes líneas
-                    odds = []
-                    j = i+3
-                    while j < len(lines) and len(odds) < 3:
-                        # Buscar patrón "1 +XXX" o "+XXX" suelto
-                        match = re.match(r'^(\d)\s+([+-]\d+)$', lines[j])
-                        if match:
-                            odds.append(match.group(2))
-                        elif re.match(r'^[+-]\d+$', lines[j]) and len(odds) < 3:
-                            odds.append(lines[j])
-                        j += 1
-                    
-                    if len(odds) >= 2:  # Al menos 2 odds (puede faltar una)
-                        # Limpiar nombres
-                        home_clean = re.sub(r'\s*\([^)]*\)', '', home_candidate).strip()
-                        away_clean = re.sub(r'\s*\([^)]*\)', '', away_candidate).strip()
-                        
-                        if self._is_valid_team(home_clean) and self._is_valid_team(away_clean):
-                            # Completar odds si faltan
-                            while len(odds) < 3:
-                                odds.append('N/A')
-                            
-                            matches.append({
-                                'home': home_clean,
-                                'away': away_clean,
-                                'all_odds': odds[:3],
-                                'liga': liga,
-                                'fecha': fecha_candidate
-                            })
-                        i = j
-                        continue
-            i += 1
-        
         return matches
     
     def _is_valid_team(self, name):
