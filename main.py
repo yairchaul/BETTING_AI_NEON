@@ -12,6 +12,7 @@ from modules.ollama_analyzer import OllamaAnalyzer
 from modules.parlay_optimizer import ParlayOptimizer
 from modules.parlay_builder import show_parlay_options
 from modules.betting_tracker import BettingTracker
+from modules.montecarlo_pro import MonteCarloPro
 
 st.set_page_config(page_title="Analizador Profesional de Apuestas", layout="wide")
 
@@ -29,6 +30,7 @@ def init_components():
         'value_detector': ValueDetector(),
         'ollama': OllamaAnalyzer(),
         'optimizer': ParlayOptimizer(),
+        'montecarlo': MonteCarloPro(simulations=50000)
     }
 
 components = init_components()
@@ -204,11 +206,61 @@ def main():
                 with st.expander(f"📊 {home} vs {away}", expanded=i==0):
                     st.caption(f"🎲 Cuotas: Local {odds[0]} | Empate {odds[1]} | Visitante {odds[2]}")
                     
-               analysis = components['analyzer'].analyze_match(home, away, {'all_odds': odds})
+                    # ============================================================================
+                    # CORRECCIÓN: Convertir odds a diccionario
+                    # ============================================================================
+                    odds_dict = {'all_odds': odds}
+                    analysis = components['analyzer'].analyze_match(home, away, odds_dict)
                     
                     if analysis:
                         liga = analysis.get('liga', 'Desconocida')
                         st.info(f"🏆 Liga detectada: **{liga}**")
+                        
+                        # Mostrar estadísticas de Monte Carlo si están disponibles
+                        if 'mc_stats' in analysis:
+                            st.caption(f"📊 Simulación Monte Carlo (50,000 partidos)")
+                            col_mc1, col_mc2, col_mc3 = st.columns(3)
+                            with col_mc1:
+                                st.metric("Goles promedio", f"{analysis['mc_stats']['avg_goals']:.2f}")
+                            with col_mc2:
+                                st.metric("Desviación", f"{analysis['mc_stats']['std_goals']:.2f}")
+                            with col_mc3:
+                                st.metric("Simulaciones", f"{analysis['mc_stats']['simulations']:,}")
+                        
+                        # Mostrar contribución de cada modelo si está disponible
+                        if 'probs_by_model' in analysis:
+                            with st.expander("📊 Contribución de modelos"):
+                                col_m1, col_m2, col_m3 = st.columns(3)
+                                
+                                models = analysis['probs_by_model']
+                                
+                                with col_m1:
+                                    st.caption("🎲 Mercado")
+                                    st.metric("Local", f"{models['market'][0]:.1%}")
+                                    st.metric("Empate", f"{models['market'][1]:.1%}")
+                                    st.metric("Visitante", f"{models['market'][2]:.1%}")
+                                
+                                with col_m2:
+                                    st.caption("📈 Poisson")
+                                    st.metric("Local", f"{models['poisson'][0]:.1%}")
+                                    st.metric("Empate", f"{models['poisson'][1]:.1%}")
+                                    st.metric("Visitante", f"{models['poisson'][2]:.1%}")
+                                
+                                with col_m3:
+                                    st.caption("⚡ ELO")
+                                    st.metric("Local", f"{models['elo'][0]:.1%}")
+                                    st.metric("Empate", f"{models['elo'][1]:.1%}")
+                                    st.metric("Visitante", f"{models['elo'][2]:.1%}")
+                                
+                                if models.get('xgb'):
+                                    st.caption("🤖 XGBoost")
+                                    col_x1, col_x2, col_x3 = st.columns(3)
+                                    with col_x1:
+                                        st.metric("Local", f"{models['xgb'][0]:.1%}")
+                                    with col_x2:
+                                        st.metric("Empate", f"{models['xgb'][1]:.1%}")
+                                    with col_x3:
+                                        st.metric("Visitante", f"{models['xgb'][2]:.1%}")
                         
                         # Análisis con Ollama
                         if use_ollama and components['ollama'].is_available:
