@@ -1,4 +1,4 @@
-# Paquetes del sistema para Debian Trixie
+# OpenGL y dependencias gráficas (reemplaza libgl1-mesa-glx)
 libgl1
 libglx-mesa0
 libglib2.0-0
@@ -6,4 +6,7 @@ libsm6
 libxext6
 libxrender-dev
 libgomp1
+
+# Tesseract OCR
 tesseract-ocr
+tesseract-ocr-spa
