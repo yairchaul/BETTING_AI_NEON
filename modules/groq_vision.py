@@ -1,4 +1,3 @@
-# modules/groq_vision.py
 import base64
 import streamlit as st
 from groq import Groq
@@ -15,7 +14,6 @@ class GroqVisionParser:
         self.is_available = False
         self.available_models = []
         
-        # Solo intentar si hay API key
         if self.api_key:
             self._initialize_with_retry()
     
@@ -29,24 +27,17 @@ class GroqVisionParser:
                 if self.available_models:
                     self.model = self.available_models[0]
                     self.is_available = True
-                    # Solo mostrar éxito si realmente hay modelo (sin warnings)
                     return
-                else:
-                    # Silencioso - no mostrar advertencias
-                    pass
             except:
-                # Silencioso - no mostrar errores
                 pass
             time.sleep(0.5)
         
         self.is_available = False
     
     def _fetch_available_models(self):
-        """Obtiene modelos de visión disponibles (silencioso)"""
+        """Obtiene modelos de visión disponibles"""
         try:
             models = self.client.models.list()
-            
-            # Palabras clave para identificar modelos de visión
             vision_keywords = ['vision', 'llama-3.2', 'llava']
             
             self.available_models = [
@@ -54,12 +45,10 @@ class GroqVisionParser:
                 if any(keyword in m.id.lower() for keyword in vision_keywords)
             ]
             
-            # Ordenar por preferencia
             preferred = ['llama-3.2-90b-vision-preview', 'llama-3.2-11b-vision-preview']
             self.available_models.sort(key=lambda x: (
                 -preferred.index(x) if x in preferred else 0
             ))
-            
         except:
             self.available_models = []
     
@@ -68,62 +57,29 @@ class GroqVisionParser:
         return base64.b64encode(image_bytes).decode('utf-8')
     
     def extract_matches_with_vision(self, image_bytes):
-        """
-        Usa Groq Vision con múltiples estrategias de prompt
-        Retorna None silenciosamente si no está disponible
-        """
+        """Extrae partidos usando Groq Vision con prompts optimizados"""
         if not self.is_available or not self.model:
             return None
         
+        # Sufijo para forzar salida JSON limpia
+        suffix = "\nResponde ÚNICAMENTE el JSON. No incluyas explicaciones, saludos ni etiquetas markdown ```json."
+        
         prompts = [
-            # Prompt para formato de 9-10 líneas
-            """
-            Esta imagen contiene partidos de fútbol. Puede estar en este formato:
+            f"""Esta imagen contiene partidos de fútbol. Puede estar en este formato:
+            [+Número] [Equipo Local] [Equipo Visitante] [Fecha] 1 [X] 2 [Cuotas]
+            Extrae TODOS los partidos. Devuelve JSON con home, away, all_odds. {suffix}""",
             
-            [+Número]
-            [Equipo Local]
-            [Equipo Visitante]
-            [Fecha]
-            1
-            [X] (opcional)
-            2
-            [Cuota Local]
-            [Cuota Empate]
-            [Cuota Visitante]
+            f"""Extrae los partidos de fútbol. Cada uno tiene: Local, Cuota L, "Empate", Cuota E, Visitante, Cuota V.
+            Devuelve JSON con objetos {{home, away, all_odds}}. {suffix}""",
             
-            Extrae TODOS los partidos. Devuelve JSON con home, away, all_odds.
-            """,
+            f"""La imagen contiene líneas con formato: [Local] [Cuota L] [Empate] [Cuota E] [Visitante] [Cuota V].
+            Extrae todos en JSON. {suffix}""",
             
-            # Prompt para formato de 6 líneas
-            """
-            Extrae los partidos de fútbol de esta imagen. Cada partido tiene:
-            1. Equipo local
-            2. Cuota local
-            3. Palabra "Empate"
-            4. Cuota empate
-            5. Equipo visitante
-            6. Cuota visitante
-            
-            Devuelve JSON con objetos {home, away, all_odds}.
-            """,
-            
-            # Prompt para formato de 1 línea
-            """
-            La imagen contiene líneas con formato:
-            [Local] [Cuota L] [Empate] [Cuota E] [Visitante] [Cuota V]
-            
-            Extrae todos los partidos en formato JSON.
-            """,
-            
-            # Prompt para lista vertical
-            """
-            La imagen contiene una lista vertical de equipos con sus cuotas.
-            Agrupa los equipos en partidos (local y visitante) con sus cuotas.
-            Devuelve JSON con objetos {home, away, all_odds}.
-            """
+            f"""Lista vertical de equipos y cuotas. Agrupa en partidos (local y visitante) con sus cuotas.
+            Devuelve JSON {{home, away, all_odds}}. {suffix}"""
         ]
         
-        for i, prompt in enumerate(prompts):
+        for prompt in prompts:
             try:
                 base64_image = self.encode_image(image_bytes)
                 
@@ -136,9 +92,7 @@ class GroqVisionParser:
                                 {"type": "text", "text": prompt},
                                 {
                                     "type": "image_url",
-                                    "image_url": {
-                                        "url": f"data:image/jpeg;base64,{base64_image}"
-                                    }
+                                    "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
                                 }
                             ]
                         }
@@ -148,6 +102,7 @@ class GroqVisionParser:
                 )
                 
                 content = response.choices[0].message.content
+                # Limpieza de posibles residuos de texto o markdown
                 content = re.sub(r'```json\s*|\s*```', '', content)
                 content = re.sub(r'```\s*', '', content)
                 
@@ -160,7 +115,6 @@ class GroqVisionParser:
                     return matches
                     
             except:
-                # Silencioso - intentar con el siguiente prompt
                 continue
         
         return None
