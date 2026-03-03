@@ -7,10 +7,31 @@ import re
 
 class GroqVisionParser:
     def __init__(self):
-        """Inicializa el cliente de Groq"""
+        """Inicializa el cliente de Groq y verifica modelos disponibles"""
         self.client = Groq(api_key=st.secrets.get("GROQ_API_KEY", ""))
-        # Modelo de visión actualizado (probamos con este)
-        self.model = "llama-3.2-90b-vision-preview"  # Modelo actual
+        self.model = self._get_available_vision_model()
+    
+    def _get_available_vision_model(self):
+        """Obtiene el primer modelo de visión disponible"""
+        try:
+            # Listar modelos disponibles
+            models = self.client.models.list()
+            vision_models = []
+            
+            for model in models.data:
+                # Filtrar modelos de visión (generalmente tienen "vision" en el ID)
+                if 'vision' in model.id:
+                    vision_models.append(model.id)
+            
+            if vision_models:
+                st.info(f"📸 Modelos de visión disponibles: {', '.join(vision_models)}")
+                return vision_models[0]  # Usar el primero disponible
+            else:
+                st.warning("⚠️ No se encontraron modelos de visión. Usando fallback.")
+                return None
+        except Exception as e:
+            st.error(f"Error consultando modelos: {e}")
+            return None
     
     def encode_image(self, image_bytes):
         """Convierte la imagen a base64"""
@@ -18,43 +39,31 @@ class GroqVisionParser:
     
     def extract_matches_with_vision(self, image_bytes):
         """
-        Usa Groq Vision para extraer los partidos en formato estructurado
+        Usa Groq Vision para extraer los partidos
         """
+        if not self.model:
+            st.warning("No hay modelo de visión disponible")
+            return []
+        
         try:
             base64_image = self.encode_image(image_bytes)
             
             prompt = """
-            Esta imagen contiene una tabla de apuestas de fútbol con múltiples partidos.
-            Los partidos están organizados en este formato:
+            Esta imagen contiene una tabla de apuestas de fútbol con este formato:
             
-            [Equipo Local]
-            [Cuota Local]
-            Empate
-            [Cuota Empate]
-            [Equipo Visitante]
-            [Cuota Visitante]
+            [Equipo Local] [Cuota Local] [Empate] [Cuota Empate] [Equipo Visitante]
             
             Ejemplo:
-            Bournemouth
-            +148
-            Empate
-            +260
-            Brentford
-            +164
+            Pacha -110 Empate +260 Necaxa
             
-            Extrae TODOS los partidos que veas en la imagen y devuélvelos en formato JSON con esta estructura:
+            Extrae TODOS los partidos y devuélvelos en JSON:
             [
               {
-                "home": "nombre del equipo local",
-                "away": "nombre del equipo visitante",
+                "home": "equipo local",
+                "away": "equipo visitante",
                 "all_odds": ["cuota_local", "cuota_empate", "cuota_visitante"]
               }
             ]
-            
-            IMPORTANTE:
-            - Incluye TODOS los partidos que aparezcan
-            - Respeta el orden exacto de los equipos
-            - Si ves "Empate" o "Empaté", es la palabra clave, no un equipo
             """
             
             response = self.client.chat.completions.create(
@@ -77,22 +86,15 @@ class GroqVisionParser:
                 max_tokens=2000,
             )
             
-            # Extraer el JSON de la respuesta
             content = response.choices[0].message.content
-            
-            # Limpiar la respuesta (a veces viene con markdown)
             content = re.sub(r'```json\s*|\s*```', '', content)
             content = re.sub(r'```\s*', '', content)
             
-            # Buscar el patrón JSON en la respuesta
             json_match = re.search(r'\[.*\]', content, re.DOTALL)
             if json_match:
                 content = json_match.group()
             
-            # Parsear JSON
-            matches = json.loads(content)
-            
-            return matches
+            return json.loads(content)
             
         except Exception as e:
             st.error(f"Error en Groq Vision: {e}")
