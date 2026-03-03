@@ -7,3 +7,6 @@ opencv-python-headless
 groq
 odds-api-io
 pandas
+streamlit
+pandas
+python-dotenv
