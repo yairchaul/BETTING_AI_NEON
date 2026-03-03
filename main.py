@@ -34,7 +34,7 @@ def init_components():
 components = init_components()
 
 def generar_parlay_pro(matches_analizados, max_selecciones=3):
-    """Genera parlay con las mejores opciones (diversificadas y sin duplicados)"""
+    """Genera parlay con las mejores opciones (diversificadas)"""
     if len(matches_analizados) < 2:
         return None
     
@@ -43,8 +43,6 @@ def generar_parlay_pro(matches_analizados, max_selecciones=3):
     partidos_usados = set()
     
     for match in matches_analizados:
-        # Buscar la mejor opción que no sea Over 1.5 si ya tenemos muchos
-        best = match.get('best_bet', {})
         markets = match.get('markets', [])
         match_name = f"{match.get('home_team', 'Unknown')} vs {match.get('away_team', 'Unknown')}"
         
@@ -55,12 +53,11 @@ def generar_parlay_pro(matches_analizados, max_selecciones=3):
         mejores_opciones = sorted(markets, key=lambda x: x['prob'], reverse=True)
         
         seleccionado = None
-        for opcion in mejores_opciones[:5]:  # Top 5
+        for opcion in mejores_opciones[:5]:
             if opcion['name'] != 'Over 1.5 goles' and opcion['category'] not in categorias_usadas:
                 seleccionado = opcion
                 break
         
-        # Si no encontramos, usar la mejor opción
         if not seleccionado and mejores_opciones:
             seleccionado = mejores_opciones[0]
         
@@ -111,7 +108,7 @@ def main():
         
         check_live_odds = st.checkbox("📡 Verificar odds en vivo", value=True)
         max_parlay = st.slider("Máximo selecciones por parlay", 2, 5, 3, 1)
-        value_threshold = st.slider("Umbral de valor", 0.0, 0.2, 0.05, 0.01)
+        value_threshold = st.slider("Umbral de EV", 0.0, 0.2, 0.05, 0.01)
         use_ollama = st.checkbox("🤖 Usar IA local (Ollama)", value=True)
         
         st.divider()
@@ -179,8 +176,11 @@ def main():
             st.divider()
             st.subheader("3. Análisis Profesional")
             
-            matches_analizados = []
+            # ============================================================================
+            # INICIO: Preparar picks para optimizador
+            # ============================================================================
             all_picks_for_optimizer = []
+            matches_analizados = []
             
             for i, match in enumerate(matches):
                 home = match.get('home', 'Unknown')
@@ -216,17 +216,17 @@ def main():
                         
                         if value_result:
                             with st.container(border=True):
-                                if value_result.get('type') == 'value_bet' and value_result.get('edge', 0) > value_threshold:
+                                if value_result.get('type') == 'value_bet' and value_result.get('ev', 0) > value_threshold:
                                     st.markdown(f"### 🔥 VALUE BET DETECTADO")
                                     st.markdown(f"**{value_result['market']}**")
                                     
                                     col_val1, col_val2 = st.columns(2)
                                     with col_val1:
-                                        st.metric("Tu probabilidad", f"{value_result.get('implied_probability', 0):.1%}")
-                                        st.metric("Odds justas", f"{1/value_result['implied_probability']:.2f}")
+                                        st.metric("Tu probabilidad", f"{value_result.get('market_prob', 0):.1%}")
+                                        st.metric("Odds justas", f"{value_result['fair_odd']:.2f}" if value_result['fair_odd'] else 'N/A')
                                     with col_val2:
                                         st.metric("Odds mercado", f"{value_result['decimal_odd']:.2f}")
-                                        st.metric("📈 EDGE", f"+{value_result['edge']:.1%}")
+                                        st.metric("📈 EV", f"+{value_result['ev']:.1%}")
                                     
                                     st.success(value_result['recommendation'])
                                 else:
@@ -235,23 +235,38 @@ def main():
                                     st.markdown(f"**{best.get('market', 'Over 1.5')}** - {best.get('probability', 0.7):.1%}")
                                     st.markdown(f"📌 *{best.get('reason', 'Análisis contextual')}*")
                         
-                        # Preparar picks para optimizador
+                        # Preparar picks para el optimizador
                         markets_filtered = [
                             m for m in analysis.get('markets', []) 
                             if m.get('prob', 0) >= prob_minima and m.get('category', '') in categorias
                         ]
                         
                         for m in markets_filtered[:3]:
+                            # Calcular EV para este pick
+                            pick_ev = 0
+                            if odds[0] != 'N/A' and 'local' in m['name'].lower():
+                                decimal_odd = components['value_detector'].american_to_decimal(odds[0])
+                                if decimal_odd:
+                                    pick_ev = (m['prob'] * decimal_odd) - 1
+                            elif odds[2] != 'N/A' and 'visitante' in m['name'].lower():
+                                decimal_odd = components['value_detector'].american_to_decimal(odds[2])
+                                if decimal_odd:
+                                    pick_ev = (m['prob'] * decimal_odd) - 1
+                            
                             all_picks_for_optimizer.append({
                                 'match': f"{analysis['home_team']} vs {analysis['away_team']}",
                                 'selection': m['name'],
                                 'prob': m['prob'],
                                 'odd': 1 / m['prob'] * 0.95,
+                                'ev': pick_ev,
                                 'category': m['category']
                             })
                         
                         matches_analizados.append(analysis)
             
+            # ============================================================================
+            # PARLAY TRADICIONAL Y OPTIMIZADO
+            # ============================================================================
             if matches_analizados:
                 st.divider()
                 
@@ -283,43 +298,54 @@ def main():
                             st.success("✅ Parlay registrado!")
                             st.rerun()
                 
-            # PARLAY OPTIMIZADO (basado en EV)
-if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
-    st.divider()
-    st.subheader("🎯 Parlay Optimizado (Basado en EV)")
-    
-    optimal = components['optimizer'].find_optimal_parlays(
-        all_picks_for_optimizer, 
-        max_size=max_parlay,
-        target_ev=value_threshold
-    )
-    
-    if optimal and isinstance(optimal, dict) and 'picks' in optimal:
-        prob_opt = np.prod([p['prob'] for p in optimal['picks']])
-        odds_opt = np.prod([p['odd'] for p in optimal['picks']])
-        ev_opt = optimal.get('ev_combined', (prob_opt * odds_opt) - 1)
+                # PARLAY OPTIMIZADO (basado en EV)
+                if all_picks_for_optimizer and len(all_picks_for_optimizer) >= 2:
+                    st.divider()
+                    st.subheader("🎯 Parlay Optimizado (Basado en EV)")
+                    
+                    optimal = components['optimizer'].find_optimal_parlays(
+                        all_picks_for_optimizer, 
+                        max_size=max_parlay,
+                        target_ev=value_threshold
+                    )
+                    
+                    if optimal and isinstance(optimal, dict) and 'picks' in optimal:
+                        prob_opt = np.prod([p['prob'] for p in optimal['picks']])
+                        odds_opt = np.prod([p['odd'] for p in optimal['picks']])
+                        ev_opt = optimal.get('ev_combined', (prob_opt * odds_opt) - 1)
+                        
+                        with st.container(border=True):
+                            col_o1, col_o2, col_o3 = st.columns(3)
+                            with col_o1:
+                                st.metric("Cuota", f"{odds_opt:.2f}")
+                            with col_o2:
+                                st.metric("Probabilidad", f"{prob_opt:.1%}")
+                            with col_o3:
+                                st.metric("EV", f"{ev_opt:.2%}")
+                            
+                            st.markdown("**Selecciones:**")
+                            for p in optimal['picks']:
+                                ev_color = '🟢' if p.get('ev', 0) > value_threshold else '🟡'
+                                st.markdown(f"{ev_color} **{p['match']}**: {p['selection']} ({p['prob']:.1%}) [EV: {p.get('ev', 0):.2%}]")
+                            
+                            if st.button("📝 Registrar parlay optimizado"):
+                                components['tracker'].add_bet({
+                                    'matches': [f"{p['match']}: {p['selection']}" for p in optimal['picks']],
+                                    'total_odds': odds_opt,
+                                    'total_prob': prob_opt
+                                }, stake=100)
+                                st.success("✅ Parlay registrado!")
+                                st.rerun()
+                    else:
+                        st.info("No se encontró un parlay con EV positivo")
         
-        with st.container(border=True):
-            col_o1, col_o2, col_o3 = st.columns(3)
-            with col_o1:
-                st.metric("Cuota", f"{odds_opt:.2f}")
-            with col_o2:
-                st.metric("Probabilidad", f"{prob_opt:.1%}")
-            with col_o3:
-                st.metric("EV", f"{ev_opt:.2%}")
-            
-            st.markdown("**Selecciones:**")
-            for p in optimal['picks']:
-                ev_color = '🟢' if p.get('ev', 0) > value_threshold else '🟡'
-                st.markdown(f"{ev_color} **{p['match']}**: {p['selection']} ({p['prob']:.1%}) [EV: {p.get('ev', 0):.2%}]")
-            
-            if st.button("📝 Registrar parlay optimizado"):
-                components['tracker'].add_bet({
-                    'matches': [f"{p['match']}: {p['selection']}" for p in optimal['picks']],
-                    'total_odds': odds_opt,
-                    'total_prob': prob_opt
-                }, stake=100)
-                st.success("✅ Parlay registrado!")
-                st.rerun()
+        else:
+            st.error("❌ No se detectaron partidos")
+            if raw_text:
+                st.code(raw_text)
+    
     else:
-        st.info("No se encontró un parlay con EV positivo")
+        st.info("👆 Sube una imagen para comenzar")
+
+if __name__ == "__main__":
+    main()
