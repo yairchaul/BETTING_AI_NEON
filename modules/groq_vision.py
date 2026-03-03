@@ -1,3 +1,4 @@
+# modules/groq_vision.py
 import base64
 import streamlit as st
 from groq import Groq
@@ -18,7 +19,6 @@ class GroqVisionParser:
             self._initialize_with_retry()
     
     def _initialize_with_retry(self, max_retries=2):
-        """Intenta inicializar Groq con reintentos (silencioso)"""
         for attempt in range(max_retries):
             try:
                 self.client = Groq(api_key=self.api_key)
@@ -31,20 +31,16 @@ class GroqVisionParser:
             except:
                 pass
             time.sleep(0.5)
-        
         self.is_available = False
     
     def _fetch_available_models(self):
-        """Obtiene modelos de visión disponibles"""
         try:
             models = self.client.models.list()
             vision_keywords = ['vision', 'llama-3.2', 'llava']
-            
             self.available_models = [
                 m.id for m in models.data 
                 if any(keyword in m.id.lower() for keyword in vision_keywords)
             ]
-            
             preferred = ['llama-3.2-90b-vision-preview', 'llama-3.2-11b-vision-preview']
             self.available_models.sort(key=lambda x: (
                 -preferred.index(x) if x in preferred else 0
@@ -53,30 +49,18 @@ class GroqVisionParser:
             self.available_models = []
     
     def encode_image(self, image_bytes):
-        """Convierte la imagen a base64"""
         return base64.b64encode(image_bytes).decode('utf-8')
     
     def extract_matches_with_vision(self, image_bytes):
-        """Extrae partidos usando Groq Vision con prompts optimizados"""
         if not self.is_available or not self.model:
             return None
         
-        # Sufijo para forzar salida JSON limpia
-        suffix = "\nResponde ÚNICAMENTE el JSON. No incluyas explicaciones, saludos ni etiquetas markdown ```json."
-        
         prompts = [
-            f"""Esta imagen contiene partidos de fútbol. Puede estar en este formato:
-            [+Número] [Equipo Local] [Equipo Visitante] [Fecha] 1 [X] 2 [Cuotas]
-            Extrae TODOS los partidos. Devuelve JSON con home, away, all_odds. {suffix}""",
+            """Extrae los partidos de fútbol. Cada uno tiene: Local, Cuota L, "Empate", Cuota E, Visitante, Cuota V.
+            Devuelve JSON con objetos {home, away, all_odds}.""",
             
-            f"""Extrae los partidos de fútbol. Cada uno tiene: Local, Cuota L, "Empate", Cuota E, Visitante, Cuota V.
-            Devuelve JSON con objetos {{home, away, all_odds}}. {suffix}""",
-            
-            f"""La imagen contiene líneas con formato: [Local] [Cuota L] [Empate] [Cuota E] [Visitante] [Cuota V].
-            Extrae todos en JSON. {suffix}""",
-            
-            f"""Lista vertical de equipos y cuotas. Agrupa en partidos (local y visitante) con sus cuotas.
-            Devuelve JSON {{home, away, all_odds}}. {suffix}"""
+            """La imagen contiene líneas con formato: [Local] [Cuota L] [Empate] [Cuota E] [Visitante] [Cuota V].
+            Extrae todos en JSON."""
         ]
         
         for prompt in prompts:
@@ -102,9 +86,7 @@ class GroqVisionParser:
                 )
                 
                 content = response.choices[0].message.content
-                # Limpieza de posibles residuos de texto o markdown
                 content = re.sub(r'```json\s*|\s*```', '', content)
-                content = re.sub(r'```\s*', '', content)
                 
                 json_match = re.search(r'\[.*\]', content, re.DOTALL)
                 if json_match:
@@ -118,4 +100,3 @@ class GroqVisionParser:
                 continue
         
         return None
-        
