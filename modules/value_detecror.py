@@ -1,6 +1,6 @@
 # modules/value_detector.py
 import streamlit as st
-from degen.american import AmericanOdds
+import numpy as np
 
 class ValueDetector:
     """
@@ -12,13 +12,22 @@ class ValueDetector:
         pass
     
     def american_to_decimal(self, american_odd):
-        """Convierte odds americanas a decimales usando degen"""
+        """Convierte odds americanas a decimales"""
         try:
-            if american_odd == 'N/A':
+            if american_odd == 'N/A' or not american_odd:
                 return None
-            # Crear objeto AmericanOdds y convertir
-            odds = AmericanOdds(american_odd)
-            return odds.decimal
+            
+            # Convertir a string y limpiar
+            odd_str = str(american_odd).strip()
+            
+            if odd_str.startswith('+'):
+                # Ejemplo: +200 -> 3.00
+                return (int(odd_str[1:]) / 100) + 1
+            elif odd_str.startswith('-'):
+                # Ejemplo: -150 -> 1.67
+                return (100 / abs(int(odd_str))) + 1
+            else:
+                return float(odd_str)
         except:
             return None
     
@@ -119,11 +128,11 @@ class ValueDetector:
         results = self.analyze_match_markets(match_analysis, match_odds)
         
         # Filtrar solo las que tienen valor positivo
-        value_bets = [r for r in results if r['has_value']]
+        value_bets = [r for r in results if r.get('has_value', False)]
         
         if value_bets:
             # Ordenar por edge (mayor a menor)
-            value_bets.sort(key=lambda x: x['edge'], reverse=True)
+            value_bets.sort(key=lambda x: x.get('edge', 0), reverse=True)
             best = value_bets[0]
             best['type'] = 'value_bet'
             return best
