@@ -7,26 +7,10 @@ import re
 
 class GroqVisionParser:
     def __init__(self):
-        """Inicializa el cliente de Groq y obtiene un modelo de visión activo."""
+        """Inicializa con el modelo estable para evitar el error 400."""
         self.client = Groq(api_key=st.secrets.get("GROQ_API_KEY", ""))
-        self.model = self._get_available_vision_model()
-
-    def _get_available_vision_model(self):
-        """
-        Consulta la API de Groq y selecciona el modelo 'instant' para evitar errores de baja.
-        """
-        if not self.client:
-            return "llama-3.2-11b-vision-instant"
-
-        try:
-            models = self.client.models.list()
-            vision_models = [m.id for m in models.data if "vision" in m.id and "preview" not in m.id]
-            
-            if "llama-3.2-11b-vision-instant" in vision_models:
-                return "llama-3.2-11b-vision-instant"
-            return vision_models[0] if vision_models else "llama-3.2-11b-vision-instant"
-        except:
-            return "llama-3.2-11b-vision-instant"
+        # Único modelo de visión estable y soportado actualmente
+        self.model = "llama-3.2-11b-vision-instant"
 
     def encode_image(self, image_bytes):
         """Convierte la imagen a base64."""
@@ -34,23 +18,33 @@ class GroqVisionParser:
 
     def extract_matches_with_vision(self, image_bytes):
         """
-        Extrae partidos y valida cuotas bloqueadas (candados).
+        Extrae partidos ignorando cuotas bloqueadas y limpiando nombres.
         """
-        if not self.model:
+        if not self.client.api_key:
             return []
 
         try:
             base64_image = self.encode_image(image_bytes)
 
+            # Prompt ultra-específico para el formato de tu imagen
             prompt = """
-            Analiza la imagen de apuestas. Para cada partido:
-            1. Identifica Equipo Local y Visitante.
-            2. Extrae cuotas 1, X, 2. 
-            3. SI HAY UN CANDADO, la cuota es "LOCKED".
-            4. Limpia los nombres: quita (M), (W), (R), etc.
+            Analiza esta imagen de apuestas deportivas. 
+            Busca bloques de partidos. Un partido tiene: Equipo 1, Equipo 2 y tres cuotas (1, X, 2).
             
-            Devuelve solo JSON:
-            [{"home": "Nombre", "away": "Nombre", "all_odds": ["1", "X", "2"]}]
+            INSTRUCCIONES CRÍTICAS:
+            1. Los nombres pueden tener (M), (W) o (R). Quita esos paréntesis para el JSON.
+            2. Las cuotas son números con signo (ej: +125, -163).
+            3. Si en lugar de número ves un icono de candado o la letra 'A', usa "LOCKED".
+            4. Si un partido tiene cuotas "LOCKED", inclúyelo pero marca las cuotas así.
+
+            Devuelve exclusivamente este formato JSON:
+            [
+              {
+                "home": "Melbourne City",
+                "away": "Buriram United",
+                "all_odds": ["+125", "+220", "+200"]
+              }
+            ]
             """
 
             response = self.client.chat.completions.create(
@@ -66,23 +60,27 @@ class GroqVisionParser:
             )
 
             content = response.choices[0].message.content
-            # Limpieza de Markdown
+            
+            # Limpieza de la respuesta
             content = re.sub(r'```json\s*|\s*```|```', '', content)
             json_match = re.search(r'\[.*\]', content, re.DOTALL)
             
             if json_match:
-                matches = json.loads(json_match.group())
-                # Validación extra: Filtrar partidos con cuotas bloqueadas
-                valid_matches = []
-                for m in matches:
-                    if "LOCKED" in m['all_odds']:
-                        st.warning(f"⚠️ Partido omitido por cuotas bloqueadas: {m['home']} vs {m['away']}")
+                raw_matches = json.loads(json_match.group())
+                
+                # VALIDACIÓN Y FILTRADO
+                final_matches = []
+                for m in raw_matches:
+                    # Si alguna cuota es LOCKED o no es un formato válido, avisamos
+                    if any(val == "LOCKED" or "A" in str(val) for val in m['all_odds']):
+                        st.warning(f"🚫 Omitido: {m['home']} vs {m['away']} (Cuotas bloqueadas)")
                     else:
-                        valid_matches.append(m)
-                return valid_matches
+                        final_matches.append(m)
+                
+                return final_matches
             
             return []
 
         except Exception as e:
-            st.error(f"Error en Groq Vision: {e}")
+            st.error(f"Error crítico en Groq Vision: {e}")
             return []
