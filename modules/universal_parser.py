@@ -4,38 +4,124 @@ import streamlit as st
 
 class UniversalParser:
     """
-    Parser universal que detecta automáticamente el formato de la imagen
+    Parser universal que detecta automáticamente TODOS los formatos de imagen
     y extrae los partidos correctamente.
     """
     
     def __init__(self):
         self.forbidden_words = ['empate', 'empaté', 'draw', 'vs', 'v', 'local', 'visitante', 'cuota', 'odds']
     
-    def _preprocess_lines(self, lines):
-        """Preprocesa líneas separando cuotas pegadas a 'Empate'"""
-        processed_lines = []
-        for line in lines:
-            match = re.match(r'^([+-]\d{3,4})\s+(Empate.*?)$', line, re.IGNORECASE)
-            if match:
-                processed_lines.append(match.group(1))
-                processed_lines.append(match.group(2))
-            else:
-                processed_lines.append(line)
-        return processed_lines
-    
     def parse(self, text):
-        """Método principal: parsea texto plano"""
-        raw_lines = [line.strip() for line in text.split('\n') if line.strip()]
-        lines = self._preprocess_lines(raw_lines)
+        """Método principal: detecta TODOS los formatos y parsea"""
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        
+        # DEBUG: Mostrar líneas detectadas
+        st.write("📄 Líneas detectadas por OCR:", lines)
         
         matches = []
         
-        # Estrategia 1: 6 líneas
-        matches.extend(self._parse_six_line_format(lines))
+        # ============================================================================
+        # ESTRATEGIA 1: Formato de 6 COLUMNAS (el que necesitas ahora)
+        # Busca líneas con el patrón: [Local] [Cuota L] [Empate] [Cuota E] [Visitante] [Cuota V]
+        # ============================================================================
+        pattern_6col = r'^(.+?)\s+([+-]\d{3,4})\s+([Ee]mpat[ea]?)\s+([+-]\d{3,4})\s+(.+?)\s+([+-]\d{3,4})$'
         
-        # Estrategia 2: 1 línea
-        if len(matches) == 0:
-            matches.extend(self._parse_one_line_format(lines))
+        for line in lines:
+            match = re.match(pattern_6col, line)
+            if match:
+                home = match.group(1).strip()
+                home_odd = match.group(2)
+                empate_word = match.group(3)
+                empate_odd = match.group(4)
+                away = match.group(5).strip()
+                away_odd = match.group(6)
+                
+                # Limpiar nombres
+                home_clean = re.sub(r'[|•\-_=+*]', '', home).strip()
+                away_clean = re.sub(r'[|•\-_=+*]', '', away).strip()
+                
+                # Verificar que sean nombres válidos
+                if (len(home_clean) > 2 and len(away_clean) > 2 and
+                    home_clean.lower() not in self.forbidden_words and
+                    away_clean.lower() not in self.forbidden_words):
+                    
+                    matches.append({
+                        'home': home_clean,
+                        'away': away_clean,
+                        'all_odds': [home_odd, empate_odd, away_odd]
+                    })
+        
+        # ============================================================================
+        # ESTRATEGIA 2: Formato de lista vertical (si no encontró con 6 columnas)
+        # ============================================================================
+        if not matches:
+            vertical_matches = self._parse_vertical_list(lines)
+            matches.extend(vertical_matches)
+        
+        # ============================================================================
+        # ESTRATEGIA 3: Formato de 6 líneas
+        # ============================================================================
+        if not matches:
+            six_line_matches = self._parse_six_line_format(lines)
+            matches.extend(six_line_matches)
+        
+        # ============================================================================
+        # ESTRATEGIA 4: Formato de 9 líneas
+        # ============================================================================
+        if not matches:
+            nine_line_matches = self._parse_nine_line_format(lines)
+            matches.extend(nine_line_matches)
+        
+        # Eliminar duplicados
+        unique_matches = []
+        seen = set()
+        for match in matches:
+            key = (match.get('home', ''), match.get('away', ''))
+            if key not in seen:
+                seen.add(key)
+                unique_matches.append(match)
+        
+        return unique_matches
+    
+    def _parse_vertical_list(self, lines):
+        """
+        Parsea formato de lista vertical:
+        [Equipo 1]
+        [Cuota 1]
+        [Equipo 2]
+        [Cuota 2]
+        """
+        matches = []
+        
+        # Extraer todas las odds
+        all_odds = []
+        for line in lines:
+            odds_in_line = re.findall(r'[+-]\d{3,4}', line)
+            all_odds.extend(odds_in_line)
+        
+        # Extraer nombres de equipos (líneas sin odds)
+        team_names = []
+        for line in lines:
+            if not re.search(r'[+-]\d{3,4}', line) and re.search(r'[A-Za-z]', line):
+                clean_name = re.sub(r'[|•\-_=+*]', '', line).strip()
+                if len(clean_name) > 3 and clean_name.lower() not in self.forbidden_words:
+                    team_names.append(clean_name)
+        
+        # Crear partidos con los primeros N equipos
+        if len(team_names) >= 2:
+            for i in range(0, len(team_names) - 1, 2):
+                if i + 1 < len(team_names):
+                    idx_odds = i
+                    if idx_odds + 2 < len(all_odds):
+                        matches.append({
+                            'home': team_names[i],
+                            'away': team_names[i + 1],
+                            'all_odds': [
+                                all_odds[idx_odds],
+                                all_odds[idx_odds + 1],
+                                all_odds[idx_odds + 2] if idx_odds + 2 < len(all_odds) else 'N/A'
+                            ]
+                        })
         
         return matches
     
@@ -51,7 +137,7 @@ class UniversalParser:
             away = lines[i+4]
             away_odd = lines[i+5]
             
-            if 'empate' in empate_word.lower():
+            if ('empate' in empate_word.lower()):
                 if (re.match(r'^[+-]\d+$', home_odd) and
                     re.match(r'^[+-]\d+$', empate_odd) and
                     re.match(r'^[+-]\d+$', away_odd)):
@@ -72,20 +158,19 @@ class UniversalParser:
             i += 1
         return matches
     
-    def _parse_one_line_format(self, lines):
-        """Formato: [Local] [Cuota L] [Empate] [Cuota E] [Visitante] [Cuota V]"""
+    def _parse_nine_line_format(self, lines):
+        """Formato de 9 líneas por partido"""
         matches = []
-        pattern = r'^(.+?)\s+([+-]\d{3,4})\s+([Ee]mpat[ea]?)\s+([+-]\d{3,4})\s+(.+?)\s+([+-]\d{3,4})$'
-        for line in lines:
-            match = re.match(pattern, line)
-            if match:
-                home_clean = re.sub(r'[|•\-_=+*]', '', match.group(1)).strip()
-                away_clean = re.sub(r'[|•\-_=+*]', '', match.group(5)).strip()
-                if (home_clean.lower() not in self.forbidden_words and 
-                    away_clean.lower() not in self.forbidden_words):
+        i = 0
+        while i < len(lines) - 8:
+            if re.match(r'^[+-]\d+$', lines[i]):
+                if lines[i+4] == '1' and lines[i+5] == '2':
                     matches.append({
-                        'home': home_clean,
-                        'away': away_clean,
-                        'all_odds': [match.group(2), match.group(4), match.group(6)]
+                        'home': lines[i+1],
+                        'away': lines[i+2],
+                        'all_odds': [lines[i+6], lines[i+7], lines[i+8]]
                     })
+                    i += 9
+                    continue
+            i += 1
         return matches
