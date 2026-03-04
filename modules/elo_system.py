@@ -134,3 +134,36 @@ class ELOSystem:
                 data = json.load(f)
                 self.ratings = data.get('ratings', {})
                 self.history = data.get('history', [])
+                
+    def get_win_probability(self, home_team, away_team):
+    """
+    Calcula probabilidad de victoria basada solo en ELO (VERSIÓN CORREGIDA)
+    """
+    rating_home = self.get_rating(home_team)
+    rating_away = self.get_rating(away_team)
+    
+    expected_home = self.expected_score(rating_home, rating_away, home=True)
+    
+    # Ajuste: El empate no es simplemente el resto
+    # En fútbol, el empate tiene su propia probabilidad basada en la liga
+    # Usamos una fórmula más realista
+    
+    # Probabilidad de empate base (mayor cuando equipos están parejos)
+    rating_diff = abs(rating_home - rating_away)
+    draw_base = max(0.20, 0.30 - (rating_diff / 2000))  # Entre 20% y 30%
+    
+    # Ajustar según ventaja local
+    home_adj = expected_home * 0.85
+    away_adj = (1 - expected_home) * 0.85
+    
+    # Normalizar
+    total = home_adj + away_adj + draw_base
+    home_prob = home_adj / total
+    draw_prob = draw_base / total
+    away_prob = away_adj / total
+    
+    return {
+        'home': home_prob,
+        'draw': draw_prob,
+        'away': away_prob
+    }
