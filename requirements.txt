@@ -16,4 +16,3 @@ scikit-learn
 joblib
 plotly
 matplotlib
-odds-api-io
