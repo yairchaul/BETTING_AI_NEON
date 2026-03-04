@@ -190,10 +190,11 @@ def main():
             st.subheader("3. Análisis Profesional")
             
             # ============================================================================
-            # INICIO: Preparar picks para optimizador
+            # INICIO: Preparar listas para resumen
             # ============================================================================
             all_picks_for_optimizer = []
             matches_analizados = []
+            mejores_opciones_global = []
             
             for i, match in enumerate(matches):
                 home = match.get('home', 'Unknown')
@@ -297,7 +298,7 @@ def main():
                                     st.caption(f"ℹ️ Sin valor significativo (EV: {value_result.get('ev', 0):.1%})")
                         
                         # ============================================================================
-                        # MOSTRAR TODOS LOS MERCADOS ANALIZADOS (LO QUE PEDISTE)
+                        # MOSTRAR TODOS LOS MERCADOS ANALIZADOS
                         # ============================================================================
                         with st.expander("📊 Ver TODOS los mercados analizados", expanded=True):
                             st.markdown("### 🎯 RESULTADO FINAL (TIEMPO REGULAR)")
@@ -322,90 +323,71 @@ def main():
                             st.markdown("---")
                             st.markdown("### 📊 TOTAL GOLES OVER/UNDER")
                             
-                            # Asegurar que existan todas las métricas
-                            over_0_5 = mc_probs.get('over_0_5', mc_probs.get('over_1_5', 0.95) * 1.2)
                             over_1_5 = mc_probs.get('over_1_5', 0.8)
                             over_2_5 = mc_probs.get('over_2_5', 0.55)
-                            over_3_5 = mc_probs.get('over_3_5', 0.3)
-                            over_4_5 = mc_probs.get('over_4_5', 0.15)
                             
                             col_t1, col_t2, col_t3 = st.columns(3)
                             with col_t1:
-                                st.metric("Over 0.5", f"{over_0_5:.1%}")
-                                st.metric("Under 0.5", f"{1 - over_0_5:.1%}")
-                            with col_t2:
                                 st.metric("Over 1.5", f"{over_1_5:.1%}")
                                 st.metric("Under 1.5", f"{1 - over_1_5:.1%}")
-                            with col_t3:
+                            with col_t2:
                                 st.metric("Over 2.5", f"{over_2_5:.1%}")
                                 st.metric("Under 2.5", f"{1 - over_2_5:.1%}")
-                            
-                            col_t4, col_t5, col_t6 = st.columns(3)
-                            with col_t4:
-                                st.metric("Over 3.5", f"{over_3_5:.1%}")
-                                st.metric("Under 3.5", f"{1 - over_3_5:.1%}")
-                            with col_t5:
-                                st.metric("Over 4.5", f"{over_4_5:.1%}")
-                                st.metric("Under 4.5", f"{1 - over_4_5:.1%}")
-                            with col_t6:
-                                st.metric("Over 5.5", f"{mc_probs.get('over_5_5', 0.05):.1%}")
-                                st.metric("Under 5.5", f"{1 - mc_probs.get('over_5_5', 0.05):.1%}")
-                            
-                            st.markdown("---")
-                            st.markdown("### ⏱️ 1RA MITAD TOTAL DE GOLES")
-                            
-                            over_0_5_1t = mc_probs.get('over_0_5_1t', over_1_5 * 0.7)
-                            over_1_5_1t = mc_probs.get('over_1_5_1t', over_2_5 * 0.4)
-                            
-                            col_h1, col_h2 = st.columns(2)
-                            with col_h1:
-                                st.metric("Over 0.5 (1T)", f"{over_0_5_1t:.1%}")
-                                st.metric("Over 1.5 (1T)", f"{over_1_5_1t:.1%}")
-                            with col_h2:
-                                st.metric("Under 0.5 (1T)", f"{1 - over_0_5_1t:.1%}")
-                                st.metric("Under 1.5 (1T)", f"{1 - over_1_5_1t:.1%}")
-                            
-                            st.markdown("---")
-                            st.markdown("### 🔀 RESULTADO FINAL CON OVER/UNDER (1.5)")
-                            
-                            col_c1, col_c2, col_c3 = st.columns(3)
-                            with col_c1:
-                                st.metric("Local + Over 1.5", f"{final_probs_list[0] * over_1_5:.1%}")
-                                st.metric("Local + Under 1.5", f"{final_probs_list[0] * (1 - over_1_5):.1%}")
-                            with col_c2:
-                                st.metric("Empate + Over 1.5", f"{final_probs_list[1] * over_1_5:.1%}")
-                                st.metric("Empate + Under 1.5", f"{final_probs_list[1] * (1 - over_1_5):.1%}")
-                            with col_c3:
-                                st.metric("Visitante + Over 1.5", f"{final_probs_list[2] * over_1_5:.1%}")
-                                st.metric("Visitante + Under 1.5", f"{final_probs_list[2] * (1 - over_1_5):.1%}")
-                            
-                            st.markdown("---")
-                            st.markdown("### 🔀 RESULTADO FINAL CON OVER/UNDER (2.5)")
-                            
-                            col_d1, col_d2, col_d3 = st.columns(3)
-                            with col_d1:
-                                st.metric("Local + Over 2.5", f"{final_probs_list[0] * over_2_5:.1%}")
-                                st.metric("Local + Under 2.5", f"{final_probs_list[0] * (1 - over_2_5):.1%}")
-                            with col_d2:
-                                st.metric("Empate + Over 2.5", f"{final_probs_list[1] * over_2_5:.1%}")
-                                st.metric("Empate + Under 2.5", f"{final_probs_list[1] * (1 - over_2_5):.1%}")
-                            with col_d3:
-                                st.metric("Visitante + Over 2.5", f"{final_probs_list[2] * over_2_5:.1%}")
-                                st.metric("Visitante + Under 2.5", f"{final_probs_list[2] * (1 - over_2_5):.1%}")
-                            
-                            st.markdown("---")
-                            st.markdown("### 🔀 RESULTADO FINAL CON OVER/UNDER (3.5)")
-                            
-                            col_e1, col_e2, col_e3 = st.columns(3)
-                            with col_e1:
-                                st.metric("Local + Over 3.5", f"{final_probs_list[0] * over_3_5:.1%}")
-                                st.metric("Local + Under 3.5", f"{final_probs_list[0] * (1 - over_3_5):.1%}")
-                            with col_e2:
-                                st.metric("Empate + Over 3.5", f"{final_probs_list[1] * over_3_5:.1%}")
-                                st.metric("Empate + Under 3.5", f"{final_probs_list[1] * (1 - over_3_5):.1%}")
-                            with col_e3:
-                                st.metric("Visitante + Over 3.5", f"{final_probs_list[2] * over_3_5:.1%}")
-                                st.metric("Visitante + Under 3.5", f"{final_probs_list[2] * (1 - over_3_5):.1%}")
+                            with col_t3:
+                                st.metric("Over 3.5", f"{mc_probs.get('over_3_5', 0.3):.1%}")
+                                st.metric("Under 3.5", f"{1 - mc_probs.get('over_3_5', 0.3):.1%}")
+                        
+                        # ============================================================================
+                        # MEJOR OPCIÓN PARA ESTE PARTIDO
+                        # ============================================================================
+                        st.markdown("---")
+                        st.subheader(f"🎯 Mejor opción para {home} vs {away}")
+                        
+                        # Crear lista de opciones para este partido
+                        opciones_partido = []
+                        
+                        # 1X2
+                        opciones_partido.append(("Gana Local", final_probs_list[0], "1X2"))
+                        opciones_partido.append(("Empate", final_probs_list[1], "1X2"))
+                        opciones_partido.append(("Gana Visitante", final_probs_list[2], "1X2"))
+                        
+                        # BTTS
+                        btts_prob = mc_probs.get('btts', 0.5)
+                        opciones_partido.append(("Ambos anotan (BTTS)", btts_prob, "BTTS"))
+                        opciones_partido.append(("No anotan ambos", 1 - btts_prob, "BTTS"))
+                        
+                        # Totales
+                        opciones_partido.append(("Over 1.5 goles", over_1_5, "Totales"))
+                        opciones_partido.append(("Under 1.5 goles", 1 - over_1_5, "Totales"))
+                        opciones_partido.append(("Over 2.5 goles", over_2_5, "Totales"))
+                        opciones_partido.append(("Under 2.5 goles", 1 - over_2_5, "Totales"))
+                        
+                        # Ordenar por probabilidad
+                        opciones_partido.sort(key=lambda x: x[1], reverse=True)
+                        
+                        # Mejor opción para este partido
+                        mejor_opcion_partido = opciones_partido[0]
+                        
+                        # Guardar para el resumen final
+                        mejores_opciones_global.append({
+                            'partido': f"{analysis['home_team']} vs {analysis['away_team']}",
+                            'opcion': mejor_opcion_partido[0],
+                            'probabilidad': mejor_opcion_partido[1],
+                            'categoria': mejor_opcion_partido[2],
+                            'cuota_justa': 1 / mejor_opcion_partido[1]
+                        })
+                        
+                        # Mostrar la mejor opción destacada
+                        with st.container(border=True):
+                            col_m1, col_m2, col_m3, col_m4 = st.columns([2, 2, 1, 1])
+                            with col_m1:
+                                st.markdown(f"### 🏆 MEJOR OPCIÓN")
+                            with col_m2:
+                                st.markdown(f"**{mejor_opcion_partido[0]}**")
+                            with col_m3:
+                                st.metric("Prob", f"{mejor_opcion_partido[1]:.1%}")
+                            with col_m4:
+                                st.metric("Cuota", f"{1/mejor_opcion_partido[1]:.2f}")
                         
                         # ============================================================================
                         # Preparar picks para el optimizador
@@ -437,6 +419,80 @@ def main():
                             })
                         
                         matches_analizados.append(analysis)
+            
+            # ============================================================================
+            # RESUMEN FINAL: MEJORES OPCIONES DE TODOS LOS PARTIDOS
+            # ============================================================================
+            if mejores_opciones_global:
+                st.divider()
+                st.subheader("📋 RESUMEN DE MEJORES OPCIONES POR PARTIDO")
+                
+                # Crear DataFrame con todas las mejores opciones
+                resumen_data = []
+                for idx, mejor in enumerate(mejores_opciones_global):
+                    resumen_data.append({
+                        '#': idx + 1,
+                        'Partido': mejor['partido'],
+                        'Mejor opción': mejor['opcion'],
+                        'Probabilidad': f"{mejor['probabilidad']:.1%}",
+                        'Categoría': mejor['categoria'],
+                        'Cuota justa': f"{mejor['cuota_justa']:.2f}"
+                    })
+                
+                df_resumen = pd.DataFrame(resumen_data)
+                st.dataframe(df_resumen, use_container_width=True, hide_index=True)
+                
+                # ============================================================================
+                # PARLAY BASADO EN LAS MEJORES OPCIONES
+                # ============================================================================
+                st.divider()
+                st.subheader("🎯 PARLAY RECOMENDADO (Mejores opciones de cada partido)")
+                
+                # Preparar picks para el parlay
+                parlay_picks = []
+                for mejor in mejores_opciones_global:
+                    odd_estimada = 1 / mejor['probabilidad'] * 0.95
+                    
+                    parlay_picks.append({
+                        'match': mejor['partido'],
+                        'selection': mejor['opcion'],
+                        'prob': mejor['probabilidad'],
+                        'odd': odd_estimada,
+                        'category': mejor['categoria']
+                    })
+                
+                # Calcular parlay
+                if len(parlay_picks) >= 2:
+                    prob_parlay = np.prod([p['prob'] for p in parlay_picks])
+                    odds_parlay = np.prod([p['odd'] for p in parlay_picks])
+                    ev_parlay = (prob_parlay * odds_parlay) - 1
+                    
+                    with st.container(border=True):
+                        col_r1, col_r2, col_r3, col_r4 = st.columns(4)
+                        with col_r1:
+                            st.metric("Partidos", len(parlay_picks))
+                        with col_r2:
+                            st.metric("Probabilidad total", f"{prob_parlay:.1%}")
+                        with col_r3:
+                            st.metric("Cuota total", f"{odds_parlay:.2f}")
+                        with col_r4:
+                            color_ev = "normal" if ev_parlay > 0 else "inverse"
+                            st.metric("EV total", f"{ev_parlay:.2%}", delta_color=color_ev)
+                        
+                        st.markdown("**Selecciones del parlay:**")
+                        for pick in parlay_picks:
+                            st.markdown(f"• **{pick['match']}**: {pick['selection']} ({pick['prob']:.1%})")
+                        
+                        if st.button("📝 Registrar este parlay (mejores opciones)"):
+                            components['tracker'].add_bet({
+                                'matches': [f"{p['match']}: {p['selection']}" for p in parlay_picks],
+                                'total_odds': odds_parlay,
+                                'total_prob': prob_parlay
+                            }, stake=100)
+                            st.success("✅ Parlay registrado!")
+                            st.rerun()
+                else:
+                    st.info("Se necesitan al menos 2 partidos para formar un parlay")
             
             # ============================================================================
             # PARLAY TRADICIONAL Y OPTIMIZADO
