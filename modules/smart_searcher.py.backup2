@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 class SmartSearcher:
     """
     Búsqueda inteligente de datos de equipos usando múltiples APIs
-    VERSIÓN FINAL - Con mapeo directo de nombres de Liga MX
+    Versión corregida con modelo Groq actualizado y mejor manejo de errores
     """
 
     def __init__(self):
@@ -20,24 +20,18 @@ class SmartSearcher:
         self.google_cse_id = st.secrets.get("GOOGLE_CSE_ID", "")
         self.odds_api_key = st.secrets.get("ODDS_API_KEY", "")
         
-        # GROQ - MODELOS VIGENTES
+        # GROQ - ACTUALIZADO a modelo vigente
         self.groq_client = None
-        self.modelo_groq = "llama-3.3-70b-versatile"
-        self.modelo_alternativo = "llama-3.1-8b-instant"
-        
         if st.secrets.get("GROQ_API_KEY"):
             try:
                 self.groq_client = Groq(api_key=st.secrets.get("GROQ_API_KEY"))
-            except Exception as e:
-                print(f"Error conectando a Groq: {e}")
+                # Probar conexión
+                self.groq_client.models.list()
+            except:
                 self.groq_client = None
                 
         self.cache = {}
-        
-        # Headers para Football-API (CORREGIDO)
-        self.football_headers = {
-            'x-apisports-key': self.football_api_key  #  HEADER CORRECTO
-        }
+        self.modelo_groq = "llama3-8b-8192"  # Modelo actualizado y vigente
 
     def normalize(self, name):
         """Normalización para matching"""
@@ -58,62 +52,10 @@ class SmartSearcher:
         return SequenceMatcher(None, self.normalize(a), self.normalize(b)).ratio()
 
     # ============================================================================
-    # FUNCIÓN CORREGIDA: MAPEO DIRECTO DE NOMBRES
-    # ============================================================================
-    def get_api_team_name(self, team_name):
-        """Obtiene el nombre correcto para buscar en la API"""
-        if not team_name:
-            return team_name
-            
-        normalized = self.normalize(team_name)
-        
-        # Mapeo DIRECTO de nombres comunes a nombres exactos de la API
-        mapeo_directo = {
-            'puebla': 'Puebla',
-            'tigres': 'Tigres UANL',
-            'tigres uanl': 'Tigres UANL',
-            'america': 'Club America',
-            'club america': 'Club America',
-            'chivas': 'Guadalajara Chivas',
-            'guadalajara': 'Guadalajara Chivas',
-            'cruz azul': 'Cruz Azul',
-            'pumas': 'U.N.A.M. - Pumas',
-            'unam': 'U.N.A.M. - Pumas',
-            'monterrey': 'Monterrey',
-            'rayados': 'Monterrey',
-            'atlas': 'Atlas',
-            'santos': 'Santos Laguna',
-            'santos laguna': 'Santos Laguna',
-            'san luis': 'Atletico San Luis',
-            'atletico san luis': 'Atletico San Luis',
-            'leon': 'Leon',
-            'necaxa': 'Necaxa',
-            'pachuca': 'Pachuca',
-            'queretaro': 'Club Queretaro',
-            'juarez': 'FC Juarez',
-            'fc juarez': 'FC Juarez',
-            'tijuana': 'Club Tijuana',
-            'xolos': 'Club Tijuana',
-            'toluca': 'Toluca',
-            'mazatlan': 'Mazatlán',
-            'mazatlán': 'Mazatlán',
-        }
-        
-        # Buscar en el mapeo
-        for key, value in mapeo_directo.items():
-            if key in normalized or normalized in key:
-                if st.session_state.get('debug_mode', False):
-                    print(f"    Mapeo: '{team_name}'  '{value}'")
-                return value
-        
-        # Si no hay mapeo, devolver el original
-        return team_name
-
-    # ============================================================================
-    # BÚSQUEDA EN FOOTBALL-API
+    # BÚSQUEDA EN FOOTBALL-API (CORREGIDO)
     # ============================================================================
     def search_team_football_api(self, team_name):
-        """Busca equipo en Football-API usando el nombre correcto"""
+        """Busca equipo en Football-API con manejo de rate limit"""
         if not self.football_api_key:
             return None
         
@@ -121,14 +63,15 @@ class SmartSearcher:
         if cache_key in self.cache:
             return self.cache[cache_key]
         
-        # Obtener el nombre correcto para la API
-        api_name = self.get_api_team_name(team_name)
-        
         try:
             url = "https://v3.football.api-sports.io/teams"
-            params = {"search": api_name}
+            params = {"search": team_name}
+            headers = {
+                "x-rapidapi-key": self.football_api_key,
+                "x-rapidapi-host": "v3.football.api-sports.io"
+            }
             
-            response = requests.get(url, headers=self.football_headers, params=params, timeout=5)
+            response = requests.get(url, headers=headers, params=params, timeout=5)
             
             if response.status_code == 200:
                 data = response.json()
@@ -136,6 +79,8 @@ class SmartSearcher:
                     team_data = data['response'][0]['team']
                     self.cache[cache_key] = team_data
                     return team_data
+            elif response.status_code == 429:
+                st.warning("Rate limit de Football-API alcanzado")
             else:
                 print(f"Error Football-API: {response.status_code}")
                 
@@ -145,13 +90,8 @@ class SmartSearcher:
         self.cache[cache_key] = None
         return None
 
-    def get_team_id(self, team_name):
-        """Obtiene el ID de un equipo en Football-API"""
-        team_info = self.search_team_football_api(team_name)
-        return team_info.get('id') if team_info else None
-
     # ============================================================================
-    # OBTENER ESTADÍSTICAS DE EQUIPO
+    # OBTENER ESTADÍSTICAS DE EQUIPO (AHORA CON DATOS REALES)
     # ============================================================================
     def get_team_stats(self, team_name):
         """Obtiene estadísticas reales del equipo"""
@@ -159,41 +99,50 @@ class SmartSearcher:
         if cache_key in self.cache:
             return self.cache[cache_key]
         
+        # Estadísticas por defecto (basadas en promedios de liga)
         stats = {
             'form': [],
-            'avg_goals_scored': 1.35,
-            'avg_goals_conceded': 1.35,
-            'btts_rate': 0.52,
-            'over_2_5_rate': 0.58,
+            'avg_goals_scored': 1.2,
+            'avg_goals_conceded': 1.2,
+            'btts_rate': 0.48,
+            'over_2_5_rate': 0.52,
             'top_scorers': [],
             'last_matches': [],
-            'home_advantage': 1.15,
-            'confidence': 0.5,
-            'source': 'default'
+            'home_advantage': 1.1,
+            'confidence': 0.5
         }
         
-        team_id = self.get_team_id(team_name)
+        # Intentar obtener datos reales de Football-API
+        team_info = self.search_team_football_api(team_name)
         
-        if team_id:
+        if team_info:
+            team_id = team_info.get('id')
+            
+            # Obtener estadísticas de la temporada actual
             try:
                 url = "https://v3.football.api-sports.io/teams/statistics"
                 params = {
                     "team": team_id,
                     "season": 2025,
-                    "league": 262  # Liga MX
+                    "league": "262"  # Liga MX
+                }
+                headers = {
+                    "x-rapidapi-key": self.football_api_key,
+                    "x-rapidapi-host": "v3.football.api-sports.io"
                 }
                 
-                response = requests.get(url, headers=self.football_headers, params=params, timeout=5)
+                response = requests.get(url, headers=headers, params=params, timeout=5)
                 
                 if response.status_code == 200:
                     data = response.json()
                     if data.get('response'):
                         stats_data = data['response']
                         
-                        stats['avg_goals_scored'] = float(stats_data.get('goals', {}).get('for', {}).get('average', {}).get('total', 1.35))
-                        stats['avg_goals_conceded'] = float(stats_data.get('goals', {}).get('against', {}).get('average', {}).get('total', 1.35))
-                        stats['confidence'] = 0.9
-                        stats['source'] = 'football-api'
+                        # Extraer estadísticas reales
+                        stats['avg_goals_scored'] = float(stats_data.get('goals', {}).get('for', {}).get('average', {}).get('total', 1.2))
+                        stats['avg_goals_conceded'] = float(stats_data.get('goals', {}).get('against', {}).get('average', {}).get('total', 1.2))
+                        stats['btts_rate'] = 0.5  # Calcular de partidos reales
+                        stats['confidence'] = 0.8
                         
             except Exception as e:
                 print(f"Error obteniendo estadísticas: {e}")
@@ -202,7 +151,7 @@ class SmartSearcher:
         return stats
 
     # ============================================================================
-    # OBTENER ENFRENTAMIENTOS DIRECTOS
+    # OBTENER ENFRENTAMIENTOS DIRECTOS (H2H)
     # ============================================================================
     def get_head_to_head(self, home_team, away_team):
         """Obtiene historial de enfrentamientos directos"""
@@ -216,28 +165,35 @@ class SmartSearcher:
             'away_wins': 0,
             'draws': 0,
             'avg_goals': 2.5,
-            'avg_home_goals': 1.25,
-            'avg_away_goals': 1.25,
+            'avg_home_goals': 1.3,
+            'avg_away_goals': 1.2,
             'btts_rate': 0.5,
             'over_2_5_rate': 0.55,
             'recent_matches': [],
             'last_meeting': None,
-            'confidence': 0.3,
-            'source': 'default'
+            'confidence': 0.3
         }
         
-        home_id = self.get_team_id(home_team)
-        away_id = self.get_team_id(away_team)
+        # Buscar IDs en Football-API
+        home_info = self.search_team_football_api(home_team)
+        away_info = self.search_team_football_api(away_team)
         
-        if home_id and away_id:
+        if home_info and away_info and self.football_api_key:
             try:
+                home_id = home_info.get('id')
+                away_id = away_info.get('id')
+                
                 url = "https://v3.football.api-sports.io/fixtures/headtohead"
                 params = {
                     "h2h": f"{home_id}-{away_id}",
                     "last": 10
                 }
+                headers = {
+                    "x-rapidapi-key": self.football_api_key,
+                    "x-rapidapi-host": "v3.football.api-sports.io"
+                }
                 
-                response = requests.get(url, headers=self.football_headers, params=params, timeout=5)
+                response = requests.get(url, headers=headers, params=params, timeout=5)
                 
                 if response.status_code == 200:
                     data = response.json()
@@ -245,7 +201,6 @@ class SmartSearcher:
                     
                     if fixtures:
                         result['total_matches'] = len(fixtures)
-                        result['source'] = 'football-api'
                         
                         home_goals_total = 0
                         away_goals_total = 0
@@ -273,7 +228,7 @@ class SmartSearcher:
                                 over_2_5_count += 1
                             
                             result['recent_matches'].append({
-                                'date': match.get('fixture', {}).get('date', '')[:10],
+                                'date': match.get('fixture', {}).get('date'),
                                 'home': match.get('teams', {}).get('home', {}).get('name'),
                                 'away': match.get('teams', {}).get('away', {}).get('name'),
                                 'score': f"{goals_home}-{goals_away}"
@@ -294,7 +249,7 @@ class SmartSearcher:
         return result
 
     # ============================================================================
-    # ANÁLISIS CON GROQ
+    # ANÁLISIS CON GROQ (MODELO ACTUALIZADO)
     # ============================================================================
     def get_recent_news(self, home_team, away_team):
         """Obtiene noticias y análisis contextual con Groq"""
@@ -306,77 +261,44 @@ class SmartSearcher:
         
         if self.groq_client:
             try:
-                prompt = f"""Analiza el partido {home_team} vs {away_team} de la Liga MX y proporciona en español:
-                1. Tres factores clave que podrían influir en el resultado
-                2. Una breve mención de posibles lesiones o sanciones
+                prompt = f"""Analiza el partido {home_team} vs {away_team} y proporciona:
+                1. 3 factores clave que podrían influir en el resultado
+                2. Posibles lesiones o sanciones importantes
+                3. Rachas recientes de ambos equipos
                 
-                Sé conciso (máximo 150 palabras)."""
+                Sé conciso y específico."""
                 
                 response = self.groq_client.chat.completions.create(
-                    model=self.modelo_groq,
+                    model=self.modelo_groq,  # MODELO ACTUALIZADO
                     messages=[
-                        {"role": "system", "content": "Eres un analista de fútbol profesional mexicano. Responde en español de forma concisa."},
+                        {"role": "system", "content": "Eres un analista de fútbol profesional. Proporciona análisis concisos y basados en datos."},
                         {"role": "user", "content": prompt}
                     ],
                     temperature=0.3,
-                    max_tokens=200
+                    max_tokens=300
                 )
                 
                 if response.choices:
                     news = [{
-                        'source': f'Groq AI',
+                        'source': 'Groq AI',
                         'summary': response.choices[0].message.content,
                         'date': datetime.now().isoformat()
                     }]
                     
             except Exception as e:
-                print(f"Error con Groq: {e}")
-        
-        if not news:
-            news = [{
-                'source': 'Análisis estadístico',
-                'summary': f"Análisis basado en estadísticas de Liga MX para {home_team} vs {away_team}.",
-                'date': datetime.now().isoformat()
-            }]
+                print(f"Error en Groq: {e}")
+                # Fallback a análisis básico
+                news = [{
+                    'source': 'Análisis básico',
+                    'summary': f"Análisis estadístico de {home_team} vs {away_team} basado en datos históricos.",
+                    'date': datetime.now().isoformat()
+                }]
         
         self.cache[cache_key] = news
         return news
 
     # ============================================================================
-    # PREDICCIÓN COMBINADA
-    # ============================================================================
-    def predict_match_outcome(self, home_team, away_team, elo_probs=None):
-        """Predicción combinada usando ELO, estadísticas y datos históricos"""
-        home_stats = self.get_team_stats(home_team)
-        away_stats = self.get_team_stats(away_team)
-        h2h = self.get_head_to_head(home_team, away_team)
-        
-        if elo_probs:
-            peso_elo = 0.6
-            peso_stats = 0.25
-            peso_h2h = 0.15
-            
-            home_strength = home_stats['avg_goals_scored'] / (home_stats['avg_goals_scored'] + away_stats['avg_goals_scored'])
-            away_strength = 1 - home_strength
-            
-            if h2h['total_matches'] > 0:
-                home_h2h = h2h['home_wins'] / h2h['total_matches']
-                away_h2h = h2h['away_wins'] / h2h['total_matches']
-                draw_h2h = h2h['draws'] / h2h['total_matches']
-            else:
-                home_h2h = away_h2h = draw_h2h = 0.33
-            
-            home_prob = (elo_probs[0] * peso_elo + home_strength * peso_stats + home_h2h * peso_h2h)
-            draw_prob = (elo_probs[1] * peso_elo + 0.33 * peso_stats + draw_h2h * peso_h2h)
-            away_prob = (elo_probs[2] * peso_elo + away_strength * peso_stats + away_h2h * peso_h2h)
-            
-            total = home_prob + draw_prob + away_prob
-            return [home_prob/total, draw_prob/total, away_prob/total]
-        
-        return None
-
-    # ============================================================================
-    # BÚSQUEDA DE EQUIPOS
+    # BÚSQUEDA DE EQUIPOS (MÉTODO PRINCIPAL)
     # ============================================================================
     def search_team(self, team_name):
         """Busca información completa de un equipo"""
@@ -389,6 +311,7 @@ class SmartSearcher:
         
         results = []
         
+        # 1. Buscar en Football-API
         team_info = self.search_team_football_api(team_name)
         if team_info:
             results.append({
@@ -398,9 +321,10 @@ class SmartSearcher:
                 'confidence': 0.9
             })
         
+        # 2. Obtener estadísticas
         stats = self.get_team_stats(team_name)
         results.append({
-            'source': stats.get('source', 'Estadísticas'),
+            'source': 'Estadísticas',
             'type': 'stats',
             'data': stats,
             'confidence': stats.get('confidence', 0.5)
@@ -408,3 +332,47 @@ class SmartSearcher:
         
         self.cache[cache_key] = results
         return results
+
+    # ============================================================================
+    # INTEGRACIÓN CON ODDS-API
+    # ============================================================================
+    def get_team_odds_history(self, team_name, days=30):
+        """Obtiene historial de odds para un equipo"""
+        if not self.odds_api_key:
+            return []
+        
+        cache_key = f"odds_history_{team_name}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        # Implementar cuando Odds-API tenga histórico
+        return []
+
+    # ============================================================================
+    # PREDICCIÓN COMBINADA (ELO + ESTADÍSTICAS)
+    # ============================================================================
+    def predict_match_outcome(self, home_team, away_team, elo_probs=None):
+        """
+        Predicción combinada usando ELO, estadísticas y datos históricos
+        """
+        # Obtener datos
+        home_stats = self.get_team_stats(home_team)
+        away_stats = self.get_team_stats(away_team)
+        h2h = self.get_head_to_head(home_team, away_team)
+        
+        # Factores de ajuste
+        home_advantage = home_stats.get('home_advantage', 1.1)
+        h2h_factor = h2h.get('confidence', 0.3)
+        
+        # Si hay ELO, combinarlo
+        if elo_probs:
+            # Combinar ELO con estadísticas
+            home_prob = (elo_probs[0] * 0.7 + (home_stats['avg_goals_scored'] / 2.5) * 0.3)
+            draw_prob = (elo_probs[1] * 0.7 + h2h.get('draws', 0) / max(h2h.get('total_matches', 1), 1) * 0.3)
+            away_prob = (elo_probs[2] * 0.7 + (away_stats['avg_goals_scored'] / 2.5) * 0.3)
+            
+            # Normalizar
+            total = home_prob + draw_prob + away_prob
+            return [home_prob/total, draw_prob/total, away_prob/total]
+        
+        return None

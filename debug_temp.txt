@@ -1,0 +1,37 @@
+﻿# Agrega esto en main.py después de analysis = components['analyzer'].analyze_match(...)
+# Busca la línea y reemplázala con:
+
+analysis = components['analyzer'].analyze_match(home, away, odds_dict)
+
+# DEBUG: Ver qué datos trajo el searcher
+if debug_mode:
+    with st.expander(f"🔍 DEBUG: Datos de búsqueda para {home} vs {away}"):
+        
+        # Probar búsqueda de equipo
+        st.subheader("📊 Búsqueda de equipos")
+        resultados_local = components['searcher'].search_team(home)
+        resultados_visitante = components['searcher'].search_team(away)
+        
+        col_d1, col_d2 = st.columns(2)
+        with col_d1:
+            st.write(f"**{home}**")
+            st.json(resultados_local if resultados_local else "No hay datos")
+        with col_d2:
+            st.write(f"**{away}**")
+            st.json(resultados_visitante if resultados_visitante else "No hay datos")
+        
+        # Historial H2H
+        st.subheader("🔄 Historial enfrentamientos")
+        h2h = components['searcher'].get_head_to_head(home, away)
+        st.write(h2h)
+        
+        # Noticias
+        st.subheader("📰 Noticias recientes")
+        news = components['searcher'].get_recent_news(home, away)
+        st.write(news)
+        
+        # Datos del análisis
+        st.subheader("📈 Datos del análisis")
+        st.write("**Probabilidades finales:**", analysis.get('final_probs', []))
+        st.write("**Monte Carlo stats:**", analysis.get('mc_stats', {}))
+        st.write("**Probs by model:**", analysis.get('probs_by_model', {}))

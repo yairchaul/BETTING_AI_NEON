@@ -1,0 +1,627 @@
+﻿# modules/pro_analyzer_ultimate.py
+import streamlit as st
+import requests
+import json
+import numpy as np
+from datetime import datetime
+from modules.team_knowledge import TeamKnowledge
+from modules.smart_searcher import SmartSearcher
+from modules.montecarlo_pro import MonteCarloPro
+from modules.elo_system import ELOSystem
+from modules.xgboost_predictor import XGBoostPredictor
+from math import exp, factorial
+from modules.team_translator import TeamTranslator
+from modules.odds_api_integrator import OddsAPIIntegrator
+
+class ProAnalyzerUltimate:
+    """
+    Analizador profesional con cobertura GLOBAL de ligas + Monte Carlo + ELO + XGBoost
+    Versión COMPLETA con TODOS los mercados de apuestas:
+    - Resultado Final (1X2)
+    - Ambos Equipos Anotan (BTTS)
+    - Totales Over/Under (0.5, 1.5, 2.5, 3.5, 4.5)
+    - Primera Mitad (Resultado y Over/Under)
+    - Resultado + Over/Under Combinado
+    - Doble Oportunidad + Over/Under
+    - Hándicap Asiático
+    - Anotadores (con Ollama)
+    """
+
+    def __init__(self):
+        self.knowledge = TeamKnowledge()
+        self.searcher = SmartSearcher()
+        self.montecarlo = MonteCarloPro(simulations=50000)
+        self.elo = ELOSystem(k_factor=32, home_advantage=100)
+        self.xgb = XGBoostPredictor()
+        self.translator = TeamTranslator()
+        self.odds_api = OddsAPIIntegrator()
+        self.max_edge = 0.06
+
+        self.weights = {
+            'market': 0.20,
+            'poisson': 0.25,
+            'elo': 0.15,
+            'xgb': 0.25,
+            'ollama': 0.15
+        }
+
+        # Intentar conectar Ollama
+        self.ollama_available = False
+        try:
+            import requests
+            response = requests.get('http://localhost:11434/api/tags', timeout=2)
+            self.ollama_available = response.status_code == 200
+        except:
+            pass
+
+    # ============================================================================
+    # FUNCIÓN PRINCIPAL DE ANÁLISIS
+    # ============================================================================
+    def analyze_match(self, home_team, away_team, odds_dict):
+        """
+        Analiza un partido y calcula TODOS los mercados disponibles
+        """
+        try:
+            # Obtener odds en formato decimal
+            odds_decimal = odds_dict.get('decimal_odds', odds_dict.get('all_odds', [2.0, 3.2, 3.5]))
+            
+            # Buscar información del equipo
+            home_info = self.searcher.get_team_stats(home_team)
+            away_info = self.searcher.get_team_stats(away_team)
+            
+            # Buscar enfrentamientos directos
+            h2h = self.searcher.get_head_to_head(home_team, away_team)
+            
+            # Obtener ratings ELO
+            home_elo, away_elo = self.elo.get_ratings(home_team, away_team)
+            
+            # Calcular fuerzas ofensivas/defensivas
+            home_attack, home_defense = self._calculate_team_strength(home_info, 'home')
+            away_attack, away_defense = self._calculate_team_strength(away_info, 'away')
+            
+            # Ajustar por localía
+            home_attack *= 1.1
+            home_defense *= 0.95
+            away_attack *= 0.95
+            away_defense *= 1.05
+            
+            # Simulación Monte Carlo
+            mc_stats = self.montecarlo.simulate_match(
+                home_team, away_team, 
+                home_attack, away_attack,
+                home_defense, away_defense
+            )
+            
+            # Probabilidades de los diferentes modelos
+            probs_by_model = self._calculate_model_probabilities(
+                home_team, away_team, home_elo, away_elo,
+                home_attack, away_attack, home_defense, away_defense,
+                h2h, home_info, away_info, mc_stats
+            )
+            
+            # Combinar probabilidades finales (1X2)
+            final_probs = self._combine_probabilities(probs_by_model)
+            
+            # Calcular TODOS los mercados
+            all_markets = self._calculate_all_markets(
+                mc_stats, final_probs, 
+                home_team, away_team,
+                home_info, away_info,
+                h2h, odds_decimal
+            )
+            
+            # Encontrar la mejor opción
+            best_market = max(all_markets, key=lambda x: x['prob'])
+            
+            # Detectar liga
+            league = self._detect_league(home_team, away_team)
+            
+            return {
+                'home_team': home_team,
+                'away_team': away_team,
+                'liga': league,
+                'final_probs': final_probs,
+                'probs_by_model': probs_by_model,
+                'mc_stats': mc_stats,
+                'markets': all_markets,
+                'best_market': best_market,
+                'total_markets': len(all_markets),
+                'elo_ratings': {'home': home_elo, 'away': away_elo},
+                'historical_data': h2h,
+                'team_stats': {'home': home_info, 'away': away_info}
+            }
+            
+        except Exception as e:
+            st.error(f"Error en analyze_match: {e}")
+            return self._get_default_analysis(home_team, away_team)
+
+    # ============================================================================
+    # CÁLCULO DE TODOS LOS MERCADOS
+    # ============================================================================
+    def _calculate_all_markets(self, mc_stats, probs_1x2, home_team, away_team,
+                               home_stats, away_stats, h2h, odds_decimal):
+        """
+        Calcula TODOS los mercados de apuestas disponibles
+        """
+        markets = []
+        
+        # ============================================================================
+        # 1. RESULTADO FINAL (1X2)
+        # ============================================================================
+        markets.append({
+            'name': 'Gana Local',
+            'prob': probs_1x2[0],
+            'category': '1X2',
+            'confidence': 'ALTA' if probs_1x2[0] > 0.6 else 'MEDIA' if probs_1x2[0] > 0.5 else 'BAJA',
+            'reason': f"Basado en {self._get_top_model(probs_1x2[0], 'local')}"
+        })
+        markets.append({
+            'name': 'Empate',
+            'prob': probs_1x2[1],
+            'category': '1X2',
+            'confidence': 'ALTA' if probs_1x2[1] > 0.6 else 'MEDIA' if probs_1x2[1] > 0.5 else 'BAJA',
+            'reason': f"Basado en {self._get_top_model(probs_1x2[1], 'draw')}"
+        })
+        markets.append({
+            'name': 'Gana Visitante',
+            'prob': probs_1x2[2],
+            'category': '1X2',
+            'confidence': 'ALTA' if probs_1x2[2] > 0.6 else 'MEDIA' if probs_1x2[2] > 0.5 else 'BAJA',
+            'reason': f"Basado en {self._get_top_model(probs_1x2[2], 'away')}"
+        })
+        
+        # ============================================================================
+        # 2. AMBOS EQUIPOS ANOTAN (BTTS)
+        # ============================================================================
+        btts_prob = mc_stats.get('btts', 0.5)
+        markets.append({
+            'name': 'BTTS - Sí',
+            'prob': btts_prob,
+            'category': 'BTTS',
+            'confidence': 'ALTA' if btts_prob > 0.65 else 'MEDIA' if btts_prob > 0.5 else 'BAJA',
+            'reason': f"Probabilidad de que ambos anoten basada en Poisson"
+        })
+        markets.append({
+            'name': 'BTTS - No',
+            'prob': 1 - btts_prob,
+            'category': 'BTTS',
+            'confidence': 'ALTA' if (1 - btts_prob) > 0.65 else 'MEDIA' if (1 - btts_prob) > 0.5 else 'BAJA',
+            'reason': f"Probabilidad de que al menos uno no anote"
+        })
+        
+        # ============================================================================
+        # 3. TOTAL GOLES OVER/UNDER
+        # ============================================================================
+        over_probs = {}
+        for total in [0.5, 1.5, 2.5, 3.5, 4.5]:
+            over_prob = mc_stats.get(f'over_{total}', 0.5)
+            over_probs[f'over_{total}'] = over_prob
+            
+            markets.append({
+                'name': f'Over {total}',
+                'prob': over_prob,
+                'category': 'Totales',
+                'confidence': 'ALTA' if over_prob > 0.65 or over_prob < 0.35 else 'MEDIA',
+                'reason': f"Distribución Poisson de goles esperados"
+            })
+            markets.append({
+                'name': f'Under {total}',
+                'prob': 1 - over_prob,
+                'category': 'Totales',
+                'confidence': 'ALTA' if (1 - over_prob) > 0.65 or (1 - over_prob) < 0.35 else 'MEDIA',
+                'reason': f"Distribución Poisson de goles esperados"
+            })
+        
+        # ============================================================================
+        # 4. PRIMERA MITAD
+        # ============================================================================
+        # Over/Under 1.5 Primera Mitad
+        over_1_5_ht = mc_stats.get('over_1_5_first_half', 0.35)
+        markets.append({
+            'name': 'Over 1.5 (1T)',
+            'prob': over_1_5_ht,
+            'category': 'Primer Tiempo',
+            'confidence': 'MEDIA',
+            'reason': "Basado en patrón de goles en primeros tiempos"
+        })
+        markets.append({
+            'name': 'Under 1.5 (1T)',
+            'prob': 1 - over_1_5_ht,
+            'category': 'Primer Tiempo',
+            'confidence': 'MEDIA',
+            'reason': "Basado en patrón de goles en primeros tiempos"
+        })
+        
+        # Resultado Primera Mitad (aproximación)
+        home_win_ht = probs_1x2[0] * 0.65  # 65% de probabilidad de ir ganando si gana el partido
+        away_win_ht = probs_1x2[2] * 0.65
+        draw_ht = 1 - home_win_ht - away_win_ht
+        
+        markets.append({
+            'name': 'Gana Local (1T)',
+            'prob': home_win_ht,
+            'category': 'Primer Tiempo',
+            'confidence': 'MEDIA',
+            'reason': "Correlación con resultado final"
+        })
+        markets.append({
+            'name': 'Empate (1T)',
+            'prob': draw_ht,
+            'category': 'Primer Tiempo',
+            'confidence': 'MEDIA',
+            'reason': "Muchos partidos llegan empatados al descanso"
+        })
+        markets.append({
+            'name': 'Gana Visitante (1T)',
+            'prob': away_win_ht,
+            'category': 'Primer Tiempo',
+            'confidence': 'MEDIA',
+            'reason': "Correlación con resultado final"
+        })
+        
+        # ============================================================================
+        # 5. RESULTADO FINAL + OVER/UNDER
+        # ============================================================================
+        for total in [1.5, 2.5, 3.5]:
+            over_prob = over_probs.get(f'over_{total}', 0.5)
+            under_prob = 1 - over_prob
+            
+            # Local + Over/Under
+            markets.append({
+                'name': f'Local y Over {total}',
+                'prob': probs_1x2[0] * over_prob,
+                'category': f'Combinado O/U {total}',
+                'confidence': 'MEDIA',
+                'reason': "Combinación de resultado y total de goles"
+            })
+            markets.append({
+                'name': f'Local y Under {total}',
+                'prob': probs_1x2[0] * under_prob,
+                'category': f'Combinado O/U {total}',
+                'confidence': 'MEDIA',
+                'reason': "Victoria local en partido con pocos goles"
+            })
+            
+            # Visitante + Over/Under
+            markets.append({
+                'name': f'Visitante y Over {total}',
+                'prob': probs_1x2[2] * over_prob,
+                'category': f'Combinado O/U {total}',
+                'confidence': 'MEDIA',
+                'reason': "Victoria visitante en partido con muchos goles"
+            })
+            markets.append({
+                'name': f'Visitante y Under {total}',
+                'prob': probs_1x2[2] * under_prob,
+                'category': f'Combinado O/U {total}',
+                'confidence': 'MEDIA',
+                'reason': "Victoria visitante en partido con pocos goles"
+            })
+            
+            # Empate + Over/Under
+            markets.append({
+                'name': f'Empate y Over {total}',
+                'prob': probs_1x2[1] * over_prob,
+                'category': f'Combinado O/U {total}',
+                'confidence': 'BAJA',
+                'reason': "Empate con muchos goles (menos común)"
+            })
+            markets.append({
+                'name': f'Empate y Under {total}',
+                'prob': probs_1x2[1] * under_prob,
+                'category': f'Combinado O/U {total}',
+                'confidence': 'MEDIA',
+                'reason': "Empate con pocos goles (típico)"
+            })
+        
+        # ============================================================================
+        # 6. DOBLE OPORTUNIDAD + OVER/UNDER
+        # ============================================================================
+        dc_probs = {
+            'home_away': probs_1x2[0] + probs_1x2[2],  # Local o Visitante (no empate)
+            'home_draw': probs_1x2[0] + probs_1x2[1],  # Local o Empate
+            'away_draw': probs_1x2[2] + probs_1x2[1]   # Visitante o Empate
+        }
+        
+        dc_labels = {
+            'home_away': 'Local/Visitante',
+            'home_draw': 'Local/Empate',
+            'away_draw': 'Visitante/Empate'
+        }
+        
+        for total in [1.5, 2.5, 3.5]:
+            over_prob = over_probs.get(f'over_{total}', 0.5)
+            under_prob = 1 - over_prob
+            
+            for dc_key, dc_prob in dc_probs.items():
+                markets.append({
+                    'name': f'{dc_labels[dc_key]} y Over {total}',
+                    'prob': dc_prob * over_prob,
+                    'category': f'Doble Oportunidad O/U {total}',
+                    'confidence': 'ALTA' if (dc_prob * over_prob) > 0.5 else 'MEDIA',
+                    'reason': "Doble oportunidad con muchos goles"
+                })
+                markets.append({
+                    'name': f'{dc_labels[dc_key]} y Under {total}',
+                    'prob': dc_prob * under_prob,
+                    'category': f'Doble Oportunidad O/U {total}',
+                    'confidence': 'ALTA' if (dc_prob * under_prob) > 0.5 else 'MEDIA',
+                    'reason': "Doble oportunidad con pocos goles"
+                })
+        
+        # ============================================================================
+        # 7. HÁNDICAP ASIÁTICO (simplificado)
+        # ============================================================================
+        # Estimar distribución de diferencia de goles
+        goal_diff_probs = self._estimate_goal_diff_distribution(mc_stats, probs_1x2)
+        
+        # Hándicap -1.5 (Local gana por 2+)
+        ah_minus_1_5 = goal_diff_probs.get('diff_2+', 0.2)
+        markets.append({
+            'name': 'Local -1.5',
+            'prob': ah_minus_1_5,
+            'category': 'Hándicap Asiático',
+            'confidence': 'MEDIA',
+            'reason': "Victoria local por 2 o más goles"
+        })
+        
+        # Hándicap +1.5 (Visitante no pierde por 2+)
+        ah_plus_1_5 = 1 - goal_diff_probs.get('diff_2+', 0.2) + goal_diff_probs.get('diff_1', 0.15) * 0.5
+        markets.append({
+            'name': 'Visitante +1.5',
+            'prob': min(ah_plus_1_5, 0.95),
+            'category': 'Hándicap Asiático',
+            'confidence': 'MEDIA',
+            'reason': "Visitante no pierde por 2+ goles"
+        })
+        
+        # Hándicap -1 (Local gana por 2+ o devolución si gana por 1)
+        ah_minus_1 = goal_diff_probs.get('diff_2+', 0.2) + goal_diff_probs.get('diff_1', 0.15) * 0.5
+        markets.append({
+            'name': 'Local -1',
+            'prob': ah_minus_1,
+            'category': 'Hándicap Asiático',
+            'confidence': 'MEDIA',
+            'reason': "Victoria local por 2+ (media devolución si gana por 1)"
+        })
+        
+        # Hándicap +1 (Visitante no pierde por 2+)
+        ah_plus_1 = 1 - goal_diff_probs.get('diff_2+', 0.2)
+        markets.append({
+            'name': 'Visitante +1',
+            'prob': ah_plus_1,
+            'category': 'Hándicap Asiático',
+            'confidence': 'MEDIA',
+            'reason': "Visitante no pierde por 2+ goles"
+        })
+        
+        # ============================================================================
+        # 8. ANOTADORES (con Ollama si está disponible)
+        # ============================================================================
+        if self.ollama_available:
+            scorers = self._get_scorers_with_ollama(home_team, away_team, home_stats, away_stats)
+            for scorer_name, prob in scorers.items():
+                if prob > 0.1:  # Solo mostrar si hay probabilidad significativa
+                    markets.append({
+                        'name': f'Anota: {scorer_name}',
+                        'prob': prob,
+                        'category': 'Anotadores',
+                        'confidence': 'BAJA',
+                        'reason': "Análisis contextual con IA"
+                    })
+        
+        # Ordenar por probabilidad
+        markets.sort(key=lambda x: x['prob'], reverse=True)
+        
+        return markets
+
+    # ============================================================================
+    # FUNCIONES AUXILIARES
+    # ============================================================================
+    def _calculate_team_strength(self, team_info, home_away):
+        """Calcula fuerza ofensiva y defensiva"""
+        if not team_info:
+            return 1.0, 1.0
+        
+        avg_scored = team_info.get('avg_goals_scored', 1.2)
+        avg_conceded = team_info.get('avg_goals_conceded', 1.2)
+        
+        attack = avg_scored / 1.2  # Normalizado
+        defense = avg_conceded / 1.2
+        
+        return attack, defense
+
+    def _calculate_model_probabilities(self, home_team, away_team, home_elo, away_elo,
+                                       home_attack, away_attack, home_defense, away_defense,
+                                       h2h, home_info, away_info, mc_stats):
+        """Calcula probabilidades de cada modelo"""
+        
+        # Probabilidades de mercado (inversa de odds)
+        market_probs = [0.34, 0.32, 0.34]  # Default
+        
+        # Probabilidades Poisson
+        poisson_probs = self._poisson_probabilities(home_attack, away_attack, 
+                                                    home_defense, away_defense)
+        
+        # Probabilidades ELO
+        elo_probs = self.elo.predict_match(home_team, away_team)
+        
+        # Probabilidades XGBoost (simulado)
+        xgb_probs = [0.33, 0.34, 0.33]
+        if hasattr(self.xgb, 'predict_match'):
+            try:
+                xgb_probs = self.xgb.predict_match(home_team, away_team, h2h)
+            except:
+                pass
+        
+        # Probabilidades Ollama
+        ollama_probs = [0.33, 0.34, 0.33]
+        if self.ollama_available:
+            ollama_probs = self._get_ollama_probabilities(home_team, away_team, home_info, away_info)
+        
+        return {
+            'market': market_probs,
+            'poisson': poisson_probs,
+            'elo': elo_probs,
+            'xgb': xgb_probs,
+            'ollama': ollama_probs
+        }
+
+    def _poisson_probabilities(self, home_attack, away_attack, home_defense, away_defense):
+        """Calcula probabilidades usando Poisson"""
+        lambda_home = home_attack * away_defense * 1.2
+        lambda_away = away_attack * home_defense * 1.0
+        
+        probs = []
+        for goals_home in range(5):
+            for goals_away in range(5):
+                prob = (exp(-lambda_home) * lambda_home**goals_home / factorial(goals_home)) * \
+                       (exp(-lambda_away) * lambda_away**goals_away / factorial(goals_away))
+                
+                if goals_home > goals_away:
+                    if len(probs) <= 0:
+                        probs.append(prob)
+                    else:
+                        probs[0] += prob
+                elif goals_home == goals_away:
+                    if len(probs) <= 1:
+                        probs.append(prob)
+                    else:
+                        probs[1] += prob
+                else:
+                    if len(probs) <= 2:
+                        probs.append(prob)
+                    else:
+                        probs[2] += prob
+        
+        # Normalizar
+        total = sum(probs)
+        return [p/total for p in probs]
+
+    def _combine_probabilities(self, probs_by_model):
+        """Combina probabilidades de todos los modelos"""
+        combined = [0, 0, 0]
+        total_weight = 0
+        
+        for model, probs in probs_by_model.items():
+            weight = self.weights.get(model, 0.2)
+            for i in range(3):
+                combined[i] += probs[i] * weight
+            total_weight += weight
+        
+        return [p/total_weight for p in combined]
+
+    def _estimate_goal_diff_distribution(self, mc_stats, probs_1x2):
+        """Estima distribución de diferencia de goles"""
+        goal_diff = {}
+        
+        # Simplificación: basado en Monte Carlo
+        goal_diff['diff_0'] = probs_1x2[1] * 0.7  # Empate
+        goal_diff['diff_1'] = (probs_1x2[0] + probs_1x2[2]) * 0.5  # Victoria por 1
+        goal_diff['diff_2+'] = (probs_1x2[0] + probs_1x2[2]) * 0.3  # Victoria por 2+
+        
+        return goal_diff
+
+    def _get_top_model(self, prob, market_type):
+        """Identifica el modelo principal para una probabilidad"""
+        if prob > 0.6:
+            return "modelos de alta confianza"
+        elif prob > 0.55:
+            return "análisis estadístico"
+        else:
+            return "múltiples modelos"
+
+    def _get_ollama_probabilities(self, home_team, away_team, home_info, away_info):
+        """Obtiene probabilidades de Ollama"""
+        try:
+            import requests
+            prompt = f"Analiza el partido {home_team} vs {away_team}. Da solo tres números (local, empate, visitante) que sumen 1.0, basado en forma reciente y lesiones."
+            
+            response = requests.post('http://localhost:11434/api/generate', 
+                                    json={'model': 'llama3.1:8b', 'prompt': prompt, 'stream': False},
+                                    timeout=5)
+            
+            if response.status_code == 200:
+                text = response.json().get('response', '')
+                numbers = re.findall(r'0\.\d+', text)
+                if len(numbers) >= 3:
+                    return [float(numbers[0]), float(numbers[1]), float(numbers[2])]
+        except:
+            pass
+        
+        return [0.33, 0.34, 0.33]
+
+    def _get_scorers_with_ollama(self, home_team, away_team, home_stats, away_stats):
+        """Identifica posibles anotadores usando Ollama"""
+        scorers = {}
+        
+        try:
+            home_scorers = home_stats.get('top_scorers', [])
+            away_scorers = away_stats.get('top_scorers', [])
+            
+            # Si no hay datos, usar nombres comunes
+            if not home_scorers:
+                home_scorers = [{'name': 'Jugador Local', 'goals': 5}]
+            if not away_scorers:
+                away_scorers = [{'name': 'Jugador Visitante', 'goals': 4}]
+            
+            import requests
+            prompt = f"Dada la lista de goleadores: Local: {home_scorers}, Visitante: {away_scorers}, ¿qué jugadores tienen más probabilidad de anotar en {home_team} vs {away_team}? Responde con nombre y probabilidad."
+            
+            response = requests.post('http://localhost:11434/api/generate',
+                                    json={'model': 'llama3.1:8b', 'prompt': prompt, 'stream': False},
+                                    timeout=5)
+            
+            if response.status_code == 200:
+                text = response.json().get('response', '')
+                # Parsear respuesta (simplificado)
+                for scorer in home_scorers[:2]:
+                    scorers[f"{scorer['name']} (Local)"] = 0.15
+                for scorer in away_scorers[:2]:
+                    scorers[f"{scorer['name']} (Visitante)"] = 0.12
+        except:
+            # Fallback: usar promedios
+            scorers['Jugador clave (Local)'] = 0.15
+            scorers['Jugador clave (Visitante)'] = 0.12
+        
+        return scorers
+
+    def _detect_league(self, home_team, away_team):
+        """Detecta la liga del partido"""
+        league = self.knowledge.detect_league(home_team, away_team)
+        return league if league else 'default'
+
+    def _get_default_analysis(self, home_team, away_team):
+        """Retorna análisis por defecto en caso de error"""
+        default_markets = [
+            {'name': 'Gana Local', 'prob': 0.35, 'category': '1X2', 'confidence': 'BAJA'},
+            {'name': 'Empate', 'prob': 0.30, 'category': '1X2', 'confidence': 'BAJA'},
+            {'name': 'Gana Visitante', 'prob': 0.35, 'category': '1X2', 'confidence': 'BAJA'},
+            {'name': 'Over 1.5', 'prob': 0.70, 'category': 'Totales', 'confidence': 'MEDIA'},
+            {'name': 'Under 1.5', 'prob': 0.30, 'category': 'Totales', 'confidence': 'MEDIA'},
+            {'name': 'BTTS - Sí', 'prob': 0.50, 'category': 'BTTS', 'confidence': 'BAJA'},
+            {'name': 'BTTS - No', 'prob': 0.50, 'category': 'BTTS', 'confidence': 'BAJA'},
+        ]
+        
+        return {
+            'home_team': home_team,
+            'away_team': away_team,
+            'liga': 'default',
+            'final_probs': [0.35, 0.30, 0.35],
+            'probs_by_model': {},
+            'mc_stats': {'avg_goals': 2.5, 'btts': 0.5, 'over_1_5': 0.7, 'over_2_5': 0.55},
+            'markets': default_markets,
+            'best_market': default_markets[3],
+            'total_markets': len(default_markets)
+        }
+
+    # ============================================================================
+    # FUNCIÓN PARA PROBAR TODOS LOS MERCADOS
+    # ============================================================================
+    def test_all_markets(self, home_team, away_team):
+        """Prueba la generación de todos los mercados"""
+        odds_dict = {
+            'all_odds': ['+150', '+200', '+180'],
+            'decimal_odds': [2.5, 3.0, 2.8]
+        }
+        return self.analyze_match(home_team, away_team, odds_dict)

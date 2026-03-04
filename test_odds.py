@@ -1,24 +1,47 @@
-# test_odds.py
+﻿# test_odds.py
 from modules.odds_api_integrator import OddsAPIIntegrator
 import streamlit as st
-from dotenv import load_dotenv
-import os
 
-# Cargar secrets manualmente para prueba
-load_dotenv()
+print("🔍 PROBANDO ODDS-API.IO")
+print("=" * 50)
+
+# Crear instancia
+odds_api = OddsAPIIntegrator()
+
+# Verificar si tiene la key
+if odds_api.api_key:
+    print(f"✅ API Key cargada: {odds_api.api_key[:5]}...{odds_api.api_key[-5:]}")
+else:
+    print("❌ No se pudo cargar la API Key")
+
+print("-" * 50)
 
 # Probar conexión
-odds_api = OddsAPIIntegrator()
 success, message = odds_api.test_connection()
 print(message)
 
 if success:
-    # Probar búsqueda de un partido real
-    odds = odds_api.get_live_odds("Manchester City", "Liverpool")
-    if odds:
-        print("\n✅ Odds encontradas:")
-        print(f"Local: {odds['cuota_local']}")
-        print(f"Empate: {odds['cuota_empate']}")
-        print(f"Visitante: {odds['cuota_visitante']}")
-    else:
-        print("\nℹ️ No hay odds para este partido ahora")
+    print("\n✅ API conectada correctamente")
+    
+    # Probar búsqueda de partidos
+    equipos = [
+        ("Manchester City", "Liverpool"),
+        ("Real Madrid", "Barcelona"),
+        ("America", "Chivas"),
+        ("Cruz Azul", "Pumas")
+    ]
+    
+    for local, visitante in equipos:
+        print(f"\n🔎 Buscando: {local} vs {visitante}")
+        odds = odds_api.get_live_odds(local, visitante)
+        
+        if odds:
+            print(f"   ✅ Local: {odds['cuota_local']}")
+            print(f"   ✅ Empate: {odds['cuota_empate']}")
+            print(f"   ✅ Visitante: {odds['cuota_visitante']}")
+            if odds.get('liga'):
+                print(f"   📌 Liga: {odds['liga']}")
+        else:
+            print("   ⏳ No hay odds disponibles ahora")
+            
+    print("\n✨ Prueba completada")

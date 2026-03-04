@@ -1,0 +1,35 @@
+EQUIPOS ENCONTRADOS EN THE ODDS API
+==================================================
+
+1. FC Saarbrücken
+AE Kifisia FC
+Alemannia Aachen
+Arsenal
+Aston Villa
+BSC Young Boys
+Bari
+Bayer Leverkusen
+Brighton and Hove Albion
+Carrarese
+Chelsea
+Empoli
+FC Ingolstadt 04
+FC Luzern
+Frosinone
+Hamburger SV
+Hansa Rostock
+Juve Stabia
+MSV Duisburg
+Mantova
+Oviedo
+PAOK Thessaloniki
+Palermo
+Pescara
+Rayo Vallecano
+Rot-Weiss Essen
+Sampdoria
+Schweinfurt
+TSV Havelse
+US Catanzaro 1929
+Waldhof Mannheim
+Wehen Wiesbaden
