@@ -18,3 +18,4 @@ from .montecarlo_pro import MonteCarloPro
 from .elo_system import ELOSystem
 from .xgboost_predictor import XGBoostPredictor
 from .data_collector import DataCollector
+from .odds_api_integrator import OddsAPIIntegrator 
