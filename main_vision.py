@@ -1,12 +1,13 @@
 ﻿import streamlit as st
 import pandas as pd
-import re
 from datetime import datetime
 from modules.vision_reader import ImageParser
-from sports.soccer import SoccerProcessor
-from sports.nba import NBAProcessor
-from sports.ufc import UFCProcessor
 from sports.ufc.vision_processor import UFCVisionProcessor
+from sports.nba.vision_processor import NBAVisionProcessor
+from sports.soccer.vision_processor import SoccerVisionProcessor
+from sports.ufc import UFCProcessor
+from sports.nba import NBAProcessor
+from sports.soccer import SoccerProcessor
 
 st.set_page_config(page_title='BETTING_AI', page_icon='🎯', layout='wide')
 
@@ -47,10 +48,16 @@ def main():
     
     tracker = ParlayTracker()
     vision = ImageParser()
-    soccer = SoccerProcessor()
-    nba = NBAProcessor()
-    ufc = UFCProcessor()
+    
+    # Procesadores de análisis
+    ufc_processor = UFCProcessor()
+    nba_processor = NBAProcessor()
+    soccer_processor = SoccerProcessor()
+    
+    # Procesadores visuales
     ufc_vision = UFCVisionProcessor()
+    nba_vision = NBAVisionProcessor()
+    soccer_vision = SoccerVisionProcessor()
     
     with st.sidebar:
         st.header('⚙️ Configuración')
@@ -81,41 +88,95 @@ def main():
             img_bytes = uploaded.getvalue()
             matches = vision.process_image(img_bytes)
             
+            # Extraer texto de matches
+            texto_crudo = []
+            if matches:
+                for match in matches:
+                    if isinstance(match, dict):
+                        for key, value in match.items():
+                            if isinstance(value, str):
+                                texto_crudo.append(value)
+                            elif isinstance(value, list):
+                                texto_crudo.extend([str(v) for v in value])
+                    elif isinstance(match, str):
+                        texto_crudo.append(match)
+            
+            # =========================================
+            # PROCESAMIENTO ESPECÍFICO POR DEPORTE
+            # =========================================
+            
             if deporte == '🥊 UFC':
-                st.header('🥊 Análisis UFC - Procesamiento Visual')
+                st.header('🥊 Análisis UFC')
                 
-                # Extraer texto de matches
-                texto_crudo = []
-                if matches:
-                    for match in matches:
-                        if isinstance(match, dict):
-                            if 'all_odds' in match:
-                                texto_crudo.extend(match['all_odds'])
-                            for key, value in match.items():
-                                if isinstance(value, str):
-                                    texto_crudo.append(value)
-                        elif isinstance(match, str):
-                            texto_crudo.append(match)
-                
-                # Mostrar texto crudo para depuración
+                # Mostrar texto detectado para depuración
                 with st.expander("🔍 Ver texto detectado"):
                     st.write(texto_crudo)
                 
-                # Procesar con el vision processor específico
+                # Procesar con el vision processor de UFC
                 peleas = ufc_vision.process_raw_text(texto_crudo)
-                ufc_vision.render_ufc_fights(peleas)
-                
+                if peleas:
+                    # Renderizar peleas
+                    for i, pelea in enumerate(peleas):
+                        with st.expander(f"**🥊 {pelea['fighter1']} vs {pelea['fighter2']}**", expanded=(i == 0)):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.markdown(f"### 🏠 **{pelea['fighter1']}**")
+                                st.metric("Cuota", pelea['odds1'])
+                            with col2:
+                                st.markdown(f"### 🚀 **{pelea['fighter2']}**")
+                                st.metric("Cuota", pelea['odds2'])
+                            
+                            # Determinar favorito
+                            try:
+                                odds1 = int(pelea['odds1'])
+                                odds2 = int(pelea['odds2'])
+                                favorito = pelea['fighter1'] if odds1 < odds2 else pelea['fighter2']
+                                prob_impl = 1 / (1 + 10 ** ((min(abs(odds1), abs(odds2)) if min(odds1, odds2) > 0 else 100) / 400))
+                                st.info(f"⭐ **Favorito:** {favorito} ({prob_impl:.1%} probabilidad)")
+                            except:
+                                pass
+                            
+                            # Botón para agregar al parlay
+                            if st.button(f"➕ Agregar {favorito if 'favorito' in locals() else 'pelea'}", key=f"ufc_{i}"):
+                                tracker.add_pick(
+                                    f"{pelea['fighter1']} vs {pelea['fighter2']}",
+                                    f"Gana {favorito}" if 'favorito' in locals() else "Pelea",
+                                    0.65,  # Placeholder
+                                    1,
+                                    'UFC'
+                                )
+                                st.rerun()
+                else:
+                    st.error('❌ No se detectaron peleas en la imagen')
+            
             elif deporte == '🏀 NBA':
                 st.header('🏀 Análisis NBA')
-                # ... (código NBA existente)
-                
+                st.info('🔧 Procesador NBA en desarrollo')
+            
             else:  # Fútbol
                 st.header('⚽ Análisis Fútbol')
-                # ... (código fútbol existente)
+                # Usar el render_match existente
+                for i, match in enumerate(matches):
+                    odds = match.get('all_odds', ['N/A', 'N/A', 'N/A'])
+                    picks = soccer_processor.render_match(
+                        i,
+                        match.get('home', 'Local'),
+                        match.get('away', 'Visitante'),
+                        odds
+                    )
+                    for p in picks:
+                        if st.button(f"➕ {p['mercado']}", key=f"futbol_{i}_{p['nivel']}"):
+                            tracker.add_pick(
+                                f"{match.get('home', 'Local')} vs {match.get('away', 'Visitante')}",
+                                p['mercado'], p['prob'], p['nivel'], 'Fútbol',
+                                p.get('ev', 0)
+                            )
+                            st.rerun()
     
+    # Parlay
     if tracker.current_picks:
         st.divider()
-        st.header('�� Parlay en construcción')
+        st.header('🎯 Parlay en construcción')
         df = pd.DataFrame(tracker.current_picks)
         st.dataframe(df, use_container_width=True)
         
