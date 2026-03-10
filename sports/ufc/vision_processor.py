@@ -15,46 +15,51 @@ class UFCVisionProcessor:
     def process_raw_text(self, raw_lines):
         # Procesa las líneas de texto crudo y estructura las peleas
         peleas = []
+        
+        # Limpiar líneas - eliminar caracteres especiales y espacios
+        lines = []
+        for line in raw_lines:
+            if isinstance(line, str):
+                # Limpiar la línea
+                clean_line = line.strip().replace('•', '').replace('*', '').strip()
+                if clean_line and not clean_line.startswith('Configuración') and not clean_line.startswith('Estadísticas'):
+                    lines.append(clean_line)
+        
+        st.write("📝 Líneas detectadas:", lines)
+        
+        # Separar peleadores y odds
+        fighters = []
+        odds = []
+        
         i = 0
-        
-        # Limpiar líneas
-        lines = [line.strip() for line in raw_lines if line.strip() and not line.startswith('•')]
-        
-        st.write("📝 Líneas detectadas:", lines)  # Debug
-        
-        while i < len(lines) - 1:
-            # Buscar patrón: peleador1, odds1, peleador2, odds2
-            current = lines[i]
-            next_line = lines[i + 1] if i + 1 < len(lines) else ""
-            
-            # Si la línea actual parece un nombre y la siguiente son odds
-            if (not re.match(r'^[+-]', current) and 
-                re.match(r'^[+-]', next_line)):
-                
-                fighter1 = current.strip('- •')
-                odds1 = next_line
-                
-                # Buscar el siguiente par
-                j = i + 2
-                while j < len(lines) - 1:
-                    if (not re.match(r'^[+-]', lines[j]) and 
-                        re.match(r'^[+-]', lines[j + 1])):
-                        fighter2 = lines[j].strip('- •')
-                        odds2 = lines[j + 1]
-                        
-                        peleas.append({
-                            'fighter1': fighter1,
-                            'odds1': odds1,
-                            'fighter2': fighter2,
-                            'odds2': odds2
-                        })
-                        i = j + 2
-                        break
-                    j += 1
+        while i < len(lines):
+            # Si la línea parece un nombre (no empieza con + o -)
+            if not lines[i].startswith('+') and not lines[i].startswith('-'):
+                # Verificar si el nombre tiene el odds pegado
+                match = self.patterns['fighter_odds'].match(lines[i])
+                if match:
+                    fighters.append(match.group(1))
+                    odds.append(match.group(2))
                 else:
-                    i += 1
-            else:
-                i += 1
+                    fighters.append(lines[i])
+                    # El odds debería estar en la siguiente línea
+                    if i + 1 < len(lines) and (lines[i+1].startswith('+') or lines[i+1].startswith('-')):
+                        odds.append(lines[i+1])
+                        i += 1
+                    else:
+                        odds.append('N/A')
+            i += 1
+        
+        # Agrupar en peleas (cada 2 fighters forman una pelea)
+        for j in range(0, len(fighters)-1, 2):
+            if j + 1 < len(fighters):
+                pelea = {
+                    'fighter1': fighters[j],
+                    'odds1': odds[j] if j < len(odds) else 'N/A',
+                    'fighter2': fighters[j+1],
+                    'odds2': odds[j+1] if j+1 < len(odds) else 'N/A'
+                }
+                peleas.append(pelea)
         
         return peleas
     
@@ -81,8 +86,12 @@ class UFCVisionProcessor:
                     st.markdown(f"### 🚀 **{pelea['fighter2']}**")
                     st.metric("Cuota", pelea['odds2'])
                 
-                # Aquí iría el llamado a tu modelo UFC
-                # picks = ufc_model.calcular(pelea)
-                # picks_totales.extend(picks)
+                # Aquí iría el cálculo de probabilidades
+                # Por ahora, picks de ejemplo
+                picks_totales.append({
+                    'pelea': f"{pelea['fighter1']} vs {pelea['fighter2']}",
+                    'favorito': pelea['fighter1'] if int(pelea['odds1']) < int(pelea['odds2']) else pelea['fighter2'],
+                    'prob_favorito': 0.65  # Placeholder
+                })
         
         return picks_totales

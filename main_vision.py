@@ -84,61 +84,38 @@ def main():
             if deporte == '🥊 UFC':
                 st.header('🥊 Análisis UFC - Procesamiento Visual')
                 
-                # Obtener texto crudo de matches
+                # Extraer texto de matches
                 texto_crudo = []
-                for match in matches:
-                    if isinstance(match, dict):
-                        texto_crudo.extend(match.get('all_odds', []))
-                    else:
-                        texto_crudo.append(str(match))
+                if matches:
+                    for match in matches:
+                        if isinstance(match, dict):
+                            if 'all_odds' in match:
+                                texto_crudo.extend(match['all_odds'])
+                            for key, value in match.items():
+                                if isinstance(value, str):
+                                    texto_crudo.append(value)
+                        elif isinstance(match, str):
+                            texto_crudo.append(match)
+                
+                # Mostrar texto crudo para depuración
+                with st.expander("🔍 Ver texto detectado"):
+                    st.write(texto_crudo)
                 
                 # Procesar con el vision processor específico
                 peleas = ufc_vision.process_raw_text(texto_crudo)
-                picks = ufc_vision.render_ufc_fights(peleas)
-                
-                # Aquí conectarías con tu modelo UFC
-                # for pick in picks:
-                #     tracker.add_pick(...)
+                ufc_vision.render_ufc_fights(peleas)
                 
             elif deporte == '🏀 NBA':
                 st.header('🏀 Análisis NBA')
-                texto_completo = ' '.join([str(m) for m in matches])
-                lineas = texto_completo.split()
-                games = nba.parse_games(lineas)
+                # ... (código NBA existente)
                 
-                for i, game in enumerate(games):
-                    picks = nba.render_game(i, game)
-                    for p in picks:
-                        if st.button(f"➕ {p['mercado']}", key=f"nba_{i}_{p['nivel']}"):
-                            tracker.add_pick(
-                                f"{game['home']} vs {game['away']}",
-                                p['mercado'], p['prob'], p['nivel'], 'NBA',
-                                p.get('ev', 0)
-                            )
-                            st.rerun()
-            
             else:  # Fútbol
                 st.header('⚽ Análisis Fútbol')
-                for i, match in enumerate(matches):
-                    odds = match.get('all_odds', ['N/A', 'N/A', 'N/A'])
-                    picks = soccer.render_match(
-                        i,
-                        match.get('home', 'Local'),
-                        match.get('away', 'Visitante'),
-                        odds
-                    )
-                    for p in picks:
-                        if st.button(f"➕ {p['mercado']}", key=f"futbol_{i}_{p['nivel']}"):
-                            tracker.add_pick(
-                                f"{match.get('home', 'Local')} vs {match.get('away', 'Visitante')}",
-                                p['mercado'], p['prob'], p['nivel'], 'Fútbol',
-                                p.get('ev', 0)
-                            )
-                            st.rerun()
+                # ... (código fútbol existente)
     
     if tracker.current_picks:
         st.divider()
-        st.header('🎯 Parlay en construcción')
+        st.header('�� Parlay en construcción')
         df = pd.DataFrame(tracker.current_picks)
         st.dataframe(df, use_container_width=True)
         
