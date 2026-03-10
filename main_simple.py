@@ -4,6 +4,7 @@ import numpy as np
 from modules.universal_parser import UniversalParser
 from modules.pro_analyzer_simple import ProAnalyzerSimple
 from modules.odds_api_integrator import OddsAPIIntegrator
+from core.data_acquisition.ufc_real_api import UFCRealAPI
 
 st.set_page_config(page_title="Analizador de Apuestas", layout="wide")
 
