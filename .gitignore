@@ -1,17 +1,22 @@
-﻿# Python
+﻿# Entorno virtual
+venv/
+env/
+ENV/
+
+# Python
 __pycache__/
 *.pyc
-venv/
-.env
+*.pyo
+*.pyd
 
-# Streamlit
-.streamlit/
+# API Keys
+.env
+.streamlit/secrets.toml
 
 # IDE
 .vscode/
 .idea/
 
-# Datos
+# Datos locales
 *.json
 !n8n_workflow.json
-historial_parlays.json
