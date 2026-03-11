@@ -1,0 +1,204 @@
+﻿"""
+BETTING_AI - VERSIÓN FINAL CON MULTI-AGENTE + MCP + n8n
+"""
+import streamlit as st
+import pandas as pd
+import numpy as np
+from datetime import datetime
+import json
+import os
+
+from api_client import OddsAPIClient
+from stats_engine_renyi import RényiPredictor, NBAAnalyzer
+from result_verifier import ResultVerifier
+from multi_agent import MultiAgentDebate, mostrar_debate_en_streamlit, MCPIntegration
+
+# ============================================
+# CONFIGURACIÓN INICIAL
+# ============================================
+st.set_page_config(page_title="BETTING_AI - ULTIMATE + IA", layout="wide")
+
+st.title("🤖 BETTING_AI - SISTEMA MULTI-AGENTE")
+st.markdown(f"### 📅 {datetime.now().strftime('%d/%m/%Y')}")
+st.caption("⚡ Claude + GPT debaten cada pick | MCP integrado | n8n ready")
+
+# ============================================
+# INICIALIZAR COMPONENTES
+# ============================================
+if 'odds_api' not in st.session_state:
+    st.session_state.odds_api = OddsAPIClient()
+    st.session_state.predictor = RényiPredictor()
+    st.session_state.nba_analyzer = NBAAnalyzer()
+    st.session_state.verifier = ResultVerifier()
+    st.session_state.debate = MultiAgentDebate()
+    st.session_state.mcp = MCPIntegration()
+    st.session_state.partidos_futbol = []
+    st.session_state.partidos_nba = []
+    st.session_state.todos_picks = []
+    st.session_state.debate_resultados = []
+
+# ============================================
+# SIDEBAR - CONTROLES
+# ============================================
+with st.sidebar:
+    st.header("🎯 CONTROLES")
+    
+    if st.button("🔄 ACTUALIZAR PARTIDOS", use_container_width=True):
+        with st.spinner("Extrayendo partidos..."):
+            st.session_state.partidos_futbol = st.session_state.odds_api.get_partidos_futbol()
+            st.session_state.partidos_nba = st.session_state.odds_api.get_partidos_nba()
+            
+            todos_picks = []
+            
+            # Procesar fútbol
+            for p in st.session_state.partidos_futbol:
+                try:
+                    probs = st.session_state.predictor.predecir_partido_futbol(p)
+                    # Aquí iría rule engine (simplificado)
+                    for nivel in range(1, 7):
+                        pick = {
+                            'deporte': '⚽',
+                            'liga': p['liga'],
+                            'partido': f"{p['local']} vs {p['visitante']}",
+                            'local': p['local'],
+                            'visitante': p['visitante'],
+                            'desc': f"Over 1.5 ({p['local']} vs {p['visitante']})",
+                            'prob': probs.get('over_1_5', 0.7),
+                            'cuota': round(1/probs.get('over_1_5', 0.7) * 0.95, 2),
+                            'value': 0.05,
+                            'nivel': nivel,
+                            'gf_local': probs.get('local', {}).get('gf', 0),
+                            'gf_visit': probs.get('visitante', {}).get('gf', 0)
+                        }
+                        todos_picks.append(pick)
+                except:
+                    pass
+            
+            st.session_state.todos_picks = todos_picks
+            st.success(f"✅ {len(todos_picks)} picks generados")
+    
+    if st.button("🤖 DEBATIR PICKS", use_container_width=True):
+        with st.spinner("Agentes debatiendo..."):
+            resultados = st.session_state.debate.obtener_top_consenso(
+                st.session_state.todos_picks, top_n=10
+            )
+            st.session_state.debate_resultados = resultados
+            st.success("✅ Debate completado")
+    
+    if st.button("🔌 PROBAR MCP", use_container_width=True):
+        if st.session_state.mcp.mcp_available:
+            st.success("✅ MCP disponible")
+        else:
+            st.warning("⚠️ MCP no instalado. Ejecuta: pip install mcp-odds-api")
+    
+    st.markdown("---")
+    st.markdown("""
+    ### 📋 INSTRUCCIONES
+    1. **Actualizar** partidos
+    2. **Debatir** picks con IA
+    3. **Agregar** al parlay
+    4. **Registrar** resultados
+    """)
+
+# ============================================
+# MAIN CONTENT
+# ============================================
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🏆 DEBATE MULTI-AGENTE",
+    "⚽ TODOS LOS PICKS",
+    "🏀 NBA",
+    "📊 MÉTRICAS"
+])
+
+with tab1:
+    if st.session_state.debate_resultados:
+        st.header("🤖 RESULTADOS DEL DEBATE")
+        st.caption("Claude + GPT analizando cada pick")
+        
+        for res in st.session_state.debate_resultados:
+            pick = res['pick']
+            color = "#00CC00" if res['decision'] == 'APOSTAR' else "#FF5500" if res['decision'] == 'EVITAR' else "#DDDD00"
+            
+            with st.container():
+                st.mar@'
+{
+  "name": "BETTING_AI - Workflow Diario Automático",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "hour": 8,
+          "minute": 0,
+          "triggerAtHour": 8,
+          "triggerAtMinute": 0
+        }
+      },
+      "id": "schedule",
+      "name": "Schedule - 8 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.the-odds-api.com/v4/sports/soccer/odds",
+        "method": "GET",
+        "authentication": "none",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "apiKey",
+              "value": "={{$env.ODDS_API_KEY}}"
+            },
+            {
+              "name": "regions",
+              "value": "mx,us,uk"
+            },
+            {
+              "name": "markets",
+              "value": "h2h"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "odds-api",
+      "name": "The Odds API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Procesar datos de odds\nconst partidos = $input.all()[0].json;\nconst picks = [];\n\nfor (const p of partidos.slice(0,5)) {\n  picks.push({\n    partido: `${p.home_team} vs ${p.away_team}`,\n    local: p.home_team,\n    visitante: p.away_team,\n    cuota_local: p.bookmakers[0].markets[0].outcomes[0].price\n  });\n}\n\nreturn picks;"
+      },
+      "id": "procesar",
+      "name": "Procesar Datos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "command": "python",
+        "commandArguments": "C:\\\\Users\\\\Yair\\\\Desktop\\\\BETTING_AI\\\\betting_ai_final.py --auto-mode"
+      },
+      "id": "python",
+      "name": "Ejecutar Python",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "🎯 *BETTING_AI - TOP 5 Picks del Día*\n\n{{$json.picks}}"
+      },
+      "id": "telegram",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [1050, 300]
+    }
+  ]
+}

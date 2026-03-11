@@ -1,33 +1,17 @@
 ﻿# Python
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-*.so
-*.dll
-
-# Streamlit secrets
-.streamlit/secrets.toml
-secrets.toml
-
-# Virtual Environment
 venv/
-env/
-ENV/
-.venv
+.env
+
+# Streamlit
+.streamlit/
 
 # IDE
 .vscode/
 .idea/
-*.swp
-*.swo
-*~
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Data (opcional, comenta si quieres subir datos)
-# data/
+# Datos
 *.json
-!requirements.txt
+!n8n_workflow.json
+historial_parlays.json
