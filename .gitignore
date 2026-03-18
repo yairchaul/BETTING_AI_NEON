@@ -10,16 +10,17 @@ __pycache__/
 venv/
 env/
 ENV/
-.env.local
 .venv
 
 # API Keys
 .env
 *.env
 
-# Cache folders
+# Data folders (no subir datasets grandes)
+ufc_data/
 cache_*/
 *.cache
+*.db
 
 # Streamlit
 .streamlit/
@@ -37,3 +38,9 @@ backup_*/
 
 # Logs
 *.log
+
+# Pruebas (ya eliminados pero por si acaso)
+probar_*.py
+verificar_*.py
+diagnostico_*.py
+backtesting_*.py

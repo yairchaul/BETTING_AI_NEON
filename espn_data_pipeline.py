@@ -1,14 +1,14 @@
 ﻿"""
-ESPN DATA PIPELINE - Extracción COMPLETA de cuotas (CORREGIDO)
+ESPN DATA PIPELINE - Extracción CORRECTA de datos UFC (país y peso desde el inicio)
 """
 import requests
-import json
 import streamlit as st
 from datetime import datetime
 
 class ESPNDataPipeline:
     def __init__(self):
         self.base_url = "https://site.web.api.espn.com/apis/site/v2/sports"
+        self.core_url = "https://sports.core.api.espn.com/v2/sports/mma/leagues/ufc"
         self.ligas_codigos = {
             "México - Liga MX": "mex.1",
             "UEFA - Champions League": "uefa.champions",
@@ -23,7 +23,7 @@ class ESPNDataPipeline:
         }
     
     def get_nba_games_with_odds(self):
-        """Obtiene partidos NBA con TODAS las cuotas"""
+        """Obtiene partidos NBA con cuotas"""
         try:
             fecha = datetime.now().strftime("%Y%m%d")
             url = f"{self.base_url}/basketball/nba/scoreboard?dates={fecha}&limit=100"
@@ -42,9 +42,6 @@ class ESPNDataPipeline:
                         home = next((c for c in competitors if c.get('homeAway') == 'home'), competitors[0])
                         away = next((c for c in competitors if c.get('homeAway') == 'away'), competitors[1])
                         
-                        # ============================================
-                        # EXTRACCIÓN CORREGIDA DE ODDS
-                        # ============================================
                         odds_data = {
                             'moneyline': {'local': 'N/A', 'visitante': 'N/A'},
                             'spread': {'valor': 0, 'local_odds': 'N/A', 'visitante_odds': 'N/A'},
@@ -54,7 +51,6 @@ class ESPNDataPipeline:
                         if 'odds' in competition and competition['odds']:
                             odds = competition['odds'][0]
                             
-                            # 1. MONEYLINE - Acceder a la estructura anidada correcta
                             if 'moneyline' in odds:
                                 ml_data = odds['moneyline']
                                 if 'home' in ml_data and 'close' in ml_data['home'] and 'odds' in ml_data['home']['close']:
@@ -62,7 +58,6 @@ class ESPNDataPipeline:
                                 if 'away' in ml_data and 'close' in ml_data['away'] and 'odds' in ml_data['away']['close']:
                                     odds_data['moneyline']['visitante'] = ml_data['away']['close']['odds']
                             
-                            # 2. SPREAD - Extraer el valor
                             if 'pointSpread' in odds:
                                 spread_data = odds['pointSpread']
                                 if 'away' in spread_data and 'close' in spread_data['away'] and 'line' in spread_data['away']['close']:
@@ -72,19 +67,16 @@ class ESPNDataPipeline:
                                     except:
                                         odds_data['spread']['valor'] = 0
                                 
-                                # Odds del spread
                                 if 'away' in spread_data and 'close' in spread_data['away'] and 'odds' in spread_data['away']['close']:
                                     odds_data['spread']['visitante_odds'] = spread_data['away']['close']['odds']
                                 if 'home' in spread_data and 'close' in spread_data['home'] and 'odds' in spread_data['home']['close']:
                                     odds_data['spread']['local_odds'] = spread_data['home']['close']['odds']
                             
-                            # 3. TOTALES
                             if 'total' in odds:
                                 total_data = odds['total']
                                 if 'over' in total_data and 'close' in total_data['over'] and 'line' in total_data['over']['close']:
                                     line_str = total_data['over']['close']['line']
                                     try:
-                                        # Remover 'o' o 'u' del inicio
                                         odds_data['totales']['linea'] = float(line_str[1:]) if line_str.startswith(('o', 'u')) else 0
                                     except:
                                         odds_data['totales']['linea'] = 0
@@ -146,7 +138,7 @@ class ESPNDataPipeline:
             return []
 
     def get_ufc_events(self):
-        """Obtiene eventos UFC"""
+        """Obtiene eventos UFC con TODOS los datos disponibles (país y peso DESDE EL INICIO)"""
         try:
             url = f"{self.base_url}/mma/ufc/scoreboard"
             response = requests.get(url, timeout=10)
@@ -162,23 +154,50 @@ class ESPNDataPipeline:
                     for competition in event.get('competitions', []):
                         competitors = competition.get('competitors', [])
                         
+                        # 🔥 EXTRAER CATEGORÍA DE PESO
+                        categoria = competition.get('type', {}).get('abbreviation', 'Peso por determinar')
+                        
                         if len(competitors) >= 2:
                             p1 = competitors[0]
                             p2 = competitors[1]
+                            
+                            # Función mejorada para extraer datos de peleador
+                            def extract_fighter_data(fighter):
+                                athlete = fighter.get('athlete', {})
+                                flag = athlete.get('flag', {})
+                                
+                                # Extraer récord
+                                record = '0-0-0'
+                                if fighter.get('records') and len(fighter['records']) > 0:
+                                    record = fighter['records'][0].get('summary', '0-0-0')
+                                
+                                # Extraer imagen
+                                imagen = None
+                                if athlete.get('headshot'):
+                                    imagen = athlete['headshot'].get('href')
+                                elif athlete.get('links'):
+                                    for link in athlete.get('links', []):
+                                        if link.get('rel') and 'headshot' in link.get('rel', []):
+                                            imagen = link.get('href')
+                                            break
+                                
+                                return {
+                                    'nombre': athlete.get('displayName', 'Desconocido'),
+                                    'record': record,
+                                    'pais': flag.get('alt', 'Desconocido') if flag else 'Desconocido',
+                                    'categoria': categoria,  # 🔥 CATEGORÍA DESDE EL INICIO
+                                    'imagen': imagen,
+                                    'id': athlete.get('id'),
+                                }
                             
                             combates.append({
                                 'id': event.get('id'),
                                 'evento': event_name,
                                 'fecha': event_date,
-                                'peleador1': {
-                                    'nombre': p1['athlete']['displayName'],
-                                    'record': p1.get('record', '0-0-0')
-                                },
-                                'peleador2': {
-                                    'nombre': p2['athlete']['displayName'],
-                                    'record': p2.get('record', '0-0-0')
-                                }
+                                'peleador1': extract_fighter_data(p1),
+                                'peleador2': extract_fighter_data(p2)
                             })
                 return combates
-        except:
+        except Exception as e:
+            st.error(f"Error obteniendo UFC: {e}")
             return []
