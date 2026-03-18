@@ -1,0 +1,49 @@
+{
+  "2026-02-22": {
+    "nombre": "UFC Fight Night: Cannonier vs. Rodrigues",
+    "combates": [
+      {
+        "peleador1": "Jared Cannonier",
+        "record1": "17-7-0",
+        "peleador2": "Gregory Rodrigues",
+        "record2": "15-6-0",
+        "ganador": "Jared Cannonier",
+        "metodo": "KO/TKO"
+      },
+      {
+        "peleador1": "Edson Barboza",
+        "record1": "24-11-0",
+        "peleador2": "Lerone Murphy",
+        "record2": "14-0-1",
+        "ganador": "Lerone Murphy",
+        "metodo": "Decisi\u00f3n"
+      }
+    ]
+  },
+  "2026-02-08": {
+    "nombre": "UFC 312: Du Plessis vs. Strickland 2",
+    "combates": [
+      {
+        "peleador1": "Dricus Du Plessis",
+        "record1": "21-2-0",
+        "peleador2": "Sean Strickland",
+        "record2": "29-6-0",
+        "ganador": "Dricus Du Plessis",
+        "metodo": "Sumisi\u00f3n"
+      }
+    ]
+  },
+  "2026-01-18": {
+    "nombre": "UFC 311: Makhachev vs. Moicano",
+    "combates": [
+      {
+        "peleador1": "Islam Makhachev",
+        "record1": "26-1-0",
+        "peleador2": "Renato Moicano",
+        "record2": "20-5-1",
+        "ganador": "Islam Makhachev",
+        "metodo": "Sumisi\u00f3n"
+      }
+    ]
+  }
+}

@@ -16,7 +16,7 @@ ENV/
 .env
 *.env
 
-# Data folders (no subir datasets grandes)
+# Data folders
 ufc_data/
 cache_*/
 *.cache
@@ -38,9 +38,3 @@ backup_*/
 
 # Logs
 *.log
-
-# Pruebas (ya eliminados pero por si acaso)
-probar_*.py
-verificar_*.py
-diagnostico_*.py
-backtesting_*.py
