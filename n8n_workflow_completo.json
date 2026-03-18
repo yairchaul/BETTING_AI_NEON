@@ -1,0 +1,58 @@
+﻿{
+  "name": "BETTING_AI - Pipeline Completo",
+  "nodes": [
+    {
+      "name": "Schedule - Cada 3 horas",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "parameters": {
+        "rule": {
+          "interval": [{"hours": 3}]
+        }
+      }
+    },
+    {
+      "name": "SportsData API - Obtener odds",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.sportsdata.io/v3/nba/odds/json/GameOddsByDate/{{$today}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Ocp-Apim-Subscription-Key", "value": "={{$env.SPORTSDATA_API_KEY}}"}
+          ]
+        }
+      }
+    },
+    {
+      "name": "Guardar en Cloud Storage",
+      "type": "n8n-nodes-base.googleCloudStorage",
+      "parameters": {
+        "operation": "upload",
+        "bucketName": "betting-ai-raw-data",
+        "fileName": "odds/{{$today}}.json",
+        "binaryData": true
+      }
+    },
+    {
+      "name": "Cargar a BigQuery",
+      "type": "n8n-nodes-base.googleBigQuery",
+      "parameters": {
+        "operation": "insert",
+        "projectId": "betting-ai",
+        "datasetId": "sports_data",
+        "tableId": "odds_history"
+      }
+    },
+    {
+      "name": "Notificar si hay value bets",
+      "type": "n8n-nodes-base.telegram",
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "🎯 Value Bet Detectado!\n\n{{$json.pick}}"
+      }
+    }
+  ]
+}

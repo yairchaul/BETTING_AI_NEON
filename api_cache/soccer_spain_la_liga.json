@@ -1,0 +1,165 @@
+{
+  "timestamp": "2026-03-12T09:03:45.855137",
+  "partidos": [
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Alav\u00e9s",
+      "visitante": "Villarreal",
+      "odds_local": 3.33,
+      "odds_empate": 3.43,
+      "odds_visitante": 2.26
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Girona",
+      "visitante": "Athletic Bilbao",
+      "odds_local": 2.75,
+      "odds_empate": 3.37,
+      "odds_visitante": 2.68
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Atl\u00e9tico Madrid",
+      "visitante": "Getafe",
+      "odds_local": 1.57,
+      "odds_empate": 3.67,
+      "odds_visitante": 7.8
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Oviedo",
+      "visitante": "Valencia",
+      "odds_local": 2.88,
+      "odds_empate": 3.2,
+      "odds_visitante": 2.68
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Real Madrid",
+      "visitante": "Elche CF",
+      "odds_local": 1.24,
+      "odds_empate": 6.74,
+      "odds_visitante": 11.09
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Mallorca",
+      "visitante": "Espanyol",
+      "odds_local": 2.38,
+      "odds_empate": 3.17,
+      "odds_visitante": 3.37
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Barcelona",
+      "visitante": "Sevilla",
+      "odds_local": 1.25,
+      "odds_empate": 6.7,
+      "odds_visitante": 10.35
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Real Betis",
+      "visitante": "Celta Vigo",
+      "odds_local": 2.22,
+      "odds_empate": 3.25,
+      "odds_visitante": 3.35
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Real Sociedad",
+      "visitante": "CA Osasuna",
+      "odds_local": 1.91,
+      "odds_empate": 3.6,
+      "odds_visitante": 4.28
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Rayo Vallecano",
+      "visitante": "Levante",
+      "odds_local": 1.64,
+      "odds_empate": 3.7,
+      "odds_visitante": 4.9
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Villarreal",
+      "visitante": "Real Sociedad",
+      "odds_local": 1.75,
+      "odds_empate": 3.5,
+      "odds_visitante": 3.8
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Elche CF",
+      "visitante": "Mallorca",
+      "odds_local": 1.99,
+      "odds_empate": 3.15,
+      "odds_visitante": 3.35
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Espanyol",
+      "visitante": "Getafe",
+      "odds_local": 2.4,
+      "odds_empate": 2.95,
+      "odds_visitante": 3.3
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "CA Osasuna",
+      "visitante": "Girona",
+      "odds_local": 2.15,
+      "odds_empate": 3.15,
+      "odds_visitante": 3.0
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Levante",
+      "visitante": "Oviedo",
+      "odds_local": 1.99,
+      "odds_empate": 3.2,
+      "odds_visitante": 3.3
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Sevilla",
+      "visitante": "Valencia",
+      "odds_local": 2.05,
+      "odds_empate": 3.0,
+      "odds_visitante": 3.35
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Barcelona",
+      "visitante": "Rayo Vallecano",
+      "odds_local": 1.19,
+      "odds_empate": 6.0,
+      "odds_visitante": 8.8
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Celta Vigo",
+      "visitante": "Alav\u00e9s",
+      "odds_local": 1.65,
+      "odds_empate": 3.2,
+      "odds_visitante": 4.75
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Athletic Bilbao",
+      "visitante": "Real Betis",
+      "odds_local": 2.0,
+      "odds_empate": 3.25,
+      "odds_visitante": 3.1
+    },
+    {
+      "liga": "SPAIN LA LIGA",
+      "local": "Real Madrid",
+      "visitante": "Atl\u00e9tico Madrid",
+      "odds_local": 1.91,
+      "odds_empate": 4.0,
+      "odds_visitante": 3.9
+    }
+  ]
+}

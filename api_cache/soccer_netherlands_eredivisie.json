@@ -1,0 +1,133 @@
+{
+  "timestamp": "2026-03-12T09:03:48.344966",
+  "partidos": [
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "FC Zwolle",
+      "visitante": "Groningen",
+      "odds_local": 2.4,
+      "odds_empate": 3.25,
+      "odds_visitante": 2.15
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "FC Volendam",
+      "visitante": "Fortuna Sittard",
+      "odds_local": 2.0,
+      "odds_empate": 3.3,
+      "odds_visitante": 2.5
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "PSV Eindhoven",
+      "visitante": "NEC Nijmegen",
+      "odds_local": 1.26,
+      "odds_empate": 4.6,
+      "odds_visitante": 5.3
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "Heerenveen",
+      "visitante": "SC Telstar",
+      "odds_local": 1.54,
+      "odds_empate": 3.8,
+      "odds_visitante": 3.8
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "Ajax",
+      "visitante": "Sparta Rotterdam",
+      "odds_local": 1.42,
+      "odds_empate": 3.8,
+      "odds_visitante": 4.4
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "FC Twente Enschede",
+      "visitante": "FC Utrecht",
+      "odds_local": 1.49,
+      "odds_empate": 4.1,
+      "odds_visitante": 4.7
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "AZ Alkmaar",
+      "visitante": "Heracles Almelo",
+      "odds_local": 1.33,
+      "odds_empate": 4.3,
+      "odds_visitante": 5.2
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "Feyenoord",
+      "visitante": "Excelsior",
+      "odds_local": 1.22,
+      "odds_empate": 4.9,
+      "odds_visitante": 6.25
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "Go Ahead Eagles",
+      "visitante": "NAC Breda",
+      "odds_local": 1.95,
+      "odds_empate": 3.3,
+      "odds_visitante": 2.6
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "Heracles Almelo",
+      "visitante": "Excelsior",
+      "odds_local": 2.05,
+      "odds_empate": 3.3,
+      "odds_visitante": 2.6
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "Fortuna Sittard",
+      "visitante": "FC Twente Enschede",
+      "odds_local": 4.8,
+      "odds_empate": 4.2,
+      "odds_visitante": 1.53
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "Sparta Rotterdam",
+      "visitante": "FC Volendam",
+      "odds_local": 1.4,
+      "odds_empate": 3.95,
+      "odds_visitante": 4.95
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "FC Zwolle",
+      "visitante": "NAC Breda",
+      "odds_local": 2.1,
+      "odds_empate": 3.25,
+      "odds_visitante": 2.6
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "NEC Nijmegen",
+      "visitante": "Heerenveen",
+      "odds_local": 1.74,
+      "odds_empate": 3.85,
+      "odds_visitante": 3.2
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "Feyenoord",
+      "visitante": "Ajax",
+      "odds_local": 1.66,
+      "odds_empate": 3.6,
+      "odds_visitante": 3.3
+    },
+    {
+      "liga": "NETHERLANDS EREDIVISIE",
+      "local": "FC Utrecht",
+      "visitante": "Go Ahead Eagles",
+      "odds_local": 1.6,
+      "odds_empate": 3.45,
+      "odds_visitante": 3.65
+    }
+  ]
+}

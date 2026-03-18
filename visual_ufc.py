@@ -1,50 +1,39 @@
 ﻿"""
-Visual de UFC - SOLO CAMBIAMOS COLORES, MISMA ESTRUCTURA
+VISUAL UFC - Muestra combates
 """
 import streamlit as st
 
 class VisualUFC:
-    """Renderizador visual para combates de UFC"""
-    
-    def render(self, combate, idx):
-        """Muestra combate - SOLO COLORES AJUSTADOS"""
-        
+    def render(self, combate, idx, tracker=None):
         with st.container():
             if idx > 0:
                 st.markdown("---")
             
+            evento = combate.get('evento', 'UFC Event')
+            fecha = combate.get('fecha', 'Próximamente')
+            
+            peleador1 = combate.get('peleador1', {})
+            peleador2 = combate.get('peleador2', {})
+            
+            p1_nombre = peleador1.get('nombre', f'Peleador {idx+1}')
+            p2_nombre = peleador2.get('nombre', f'Peleador {idx+2}')
+            p1_record = peleador1.get('record', '0-0-0')
+            p2_record = peleador2.get('record', '0-0-0')
+            
             if idx == 0:
-                st.markdown(f"## 🥊 {combate['evento']}")
-                st.markdown(f"**📅 {combate.get('fecha', 'Próximamente')}**")
-                st.markdown("---")
+                st.markdown(f"### 🥊 {evento}")
+                st.markdown(f"📅 {fecha}")
             
-            # Color según tipo de tarjeta
-            tarjeta_color = "#FF6B35" if combate['tipo_tarjeta'] == 'Principal' else "#888888"
-            st.markdown(f"<h4 style='color: {tarjeta_color};'>{combate['tipo_tarjeta']}</h4>", unsafe_allow_html=True)
+            st.markdown(f"**{p1_nombre}** ({p1_record}) vs **{p2_nombre}** ({p2_record})")
             
-            # DOS COLUMNAS - SOLO COLORES DE FONDO
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown(f"""
-                <div style="padding: 15px; background-color: #1A1A1A; border-left: 4px solid #FF6B35; border-radius: 5px;">
-                    <h3 style="color: #FF6B35; margin: 0;">🔴 {combate['peleador1']['nombre']}</h3>
-                    <p style="color: #CCCCCC; margin: 5px 0;"><strong>Récord:</strong> {combate['peleador1']['record']}</p>
-                    <p style="color: #CCCCCC; margin: 5px 0;"><strong>País:</strong> {combate['peleador1']['pais']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown(f"""
-                <div style="padding: 15px; background-color: #1A1A1A; border-left: 4px solid #0066CC; border-radius: 5px;">
-                    <h3 style="color: #0066CC; margin: 0;">🔵 {combate['peleador2']['nombre']}</h3>
-                    <p style="color: #CCCCCC; margin: 5px 0;"><strong>Récord:</strong> {combate['peleador2']['record']}</p>
-                    <p style="color: #CCCCCC; margin: 5px 0;"><strong>País:</strong> {combate['peleador2']['pais']}</p>
-                </div>
-                """, unsafe_allow_html=True)
-            
-            # Botón análisis (IGUAL)
-            if st.button(f"🤖 Analizar combate", key=f"ufc_{idx}"):
-                st.info("⚡ Análisis multi-agente próximo...")
+            if st.button(f"➕ AGREGAR", key=f"ufc_{idx}_{p1_nombre}"):
+                if tracker:
+                    tracker.agregar_pick({
+                        'partido': f"{p1_nombre} vs {p2_nombre}",
+                        'pick': f"Gana {p1_nombre}",
+                        'cuota': 2.0,
+                        'deporte': 'UFC'
+                    })
+                    st.success("✓ Agregado")
             
             st.markdown("---")

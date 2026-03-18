@@ -1,0 +1,69 @@
+{
+  "timestamp": "2026-03-12T09:03:45.322214",
+  "partidos": [
+    {
+      "liga": "UEFA EUROPA LEAGUE",
+      "local": "Bologna",
+      "visitante": "AS Roma",
+      "odds_local": 3.25,
+      "odds_empate": 3.0,
+      "odds_visitante": 2.55
+    },
+    {
+      "liga": "UEFA EUROPA LEAGUE",
+      "local": "Lille",
+      "visitante": "Aston Villa",
+      "odds_local": 3.35,
+      "odds_empate": 3.35,
+      "odds_visitante": 2.33
+    },
+    {
+      "liga": "UEFA EUROPA LEAGUE",
+      "local": "Panathinaikos FC",
+      "visitante": "Real Betis",
+      "odds_local": 3.95,
+      "odds_empate": 3.4,
+      "odds_visitante": 2.08
+    },
+    {
+      "liga": "UEFA EUROPA LEAGUE",
+      "local": "VfB Stuttgart",
+      "visitante": "Porto",
+      "odds_local": 2.0,
+      "odds_empate": 3.5,
+      "odds_visitante": 4.0
+    },
+    {
+      "liga": "UEFA EUROPA LEAGUE",
+      "local": "Celta Vigo",
+      "visitante": "Lyon",
+      "odds_local": 2.04,
+      "odds_empate": 3.45,
+      "odds_visitante": 3.9
+    },
+    {
+      "liga": "UEFA EUROPA LEAGUE",
+      "local": "Nottingham Forest",
+      "visitante": "FC Midtjylland",
+      "odds_local": 1.51,
+      "odds_empate": 4.6,
+      "odds_visitante": 6.25
+    },
+    {
+      "liga": "UEFA EUROPA LEAGUE",
+      "local": "Ferencv\u00e1ros TC",
+      "visitante": "SC Braga",
+      "odds_local": 3.2,
+      "odds_empate": 3.4,
+      "odds_visitante": 2.35
+    },
+    {
+      "liga": "UEFA EUROPA LEAGUE",
+      "local": "KRC Genk",
+      "visitante": "SC Freiburg",
+      "odds_local": 2.8,
+      "odds_empate": 3.3,
+      "odds_visitante": 2.75
+    }
+  ]
+}

@@ -1,0 +1,55 @@
+[
+  {
+    "fecha": "2026-03-11T13:16:44.936284",
+    "parlay": [
+      {
+        "desc": "🎯 Liverpool GANA + OVER 2.5",
+        "prob": 0.5622361208371901,
+        "cuota": 1.71,
+        "tipo": "combo",
+        "nivel": 2,
+        "partido": "Liverpool vs Galatasaray",
+        "liga": "UEFA Champions League",
+        "timestamp": "2026-03-11T13:09:54.348045"
+      },
+      {
+        "desc": "🎯 Bayern Munich GANA + OVER 2.5",
+        "prob": 0.5684105461397747,
+        "cuota": 1.73,
+        "tipo": "combo",
+        "nivel": 2,
+        "partido": "Bayern Munich vs Atalanta",
+        "liga": "UEFA Champions League",
+        "timestamp": "2026-03-11T13:09:55.711349"
+      },
+      {
+        "desc": "🎯 Tigres UANL GANA + OVER 2.5",
+        "prob": 0.5132865394890747,
+        "cuota": 2.37,
+        "tipo": "combo",
+        "nivel": 2,
+        "partido": "Tigres UANL vs Cincinnati",
+        "liga": "CONCACAF Champions Cup",
+        "timestamp": "2026-03-11T13:10:01.699635"
+      },
+      {
+        "desc": "🎯 Monterrey GANA + OVER 2.5",
+        "prob": 0.4993756990517781,
+        "cuota": 2.45,
+        "tipo": "combo",
+        "nivel": 2,
+        "partido": "Monterrey vs Inter Miami",
+        "liga": "CONCACAF Champions Cup",
+        "timestamp": "2026-03-11T13:10:03.924924"
+      }
+    ],
+    "cuota_total": 17.17736895,
+    "prob_total": 0.08191588931730326,
+    "value_total": 0.4070994536706818,
+    "stake": 10,
+    "resultado": "win",
+    "payout": 171.77368950000002,
+    "profit": 161.77368950000002,
+    "num_picks": 4
+  }
+]

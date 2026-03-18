@@ -1,0 +1,284 @@
+{
+  "timestamp": "2026-03-12T09:03:50.312859",
+  "partidos": [
+    {
+      "liga": "NBA",
+      "local": "Detroit Pistons",
+      "visitante": "Philadelphia 76ers",
+      "odds": {
+        "h2h": {
+          "Detroit Pistons": 1.09,
+          "Philadelphia 76ers": 8.0
+        },
+        "spreads": {
+          "Detroit Pistons": {
+            "price": 1.87,
+            "point": -15.0
+          },
+          "Philadelphia 76ers": {
+            "price": 1.95,
+            "point": 15.0
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.94,
+            "point": 222.5
+          },
+          "Under": {
+            "price": 1.88,
+            "point": 222.5
+          }
+        }
+      }
+    },
+    {
+      "liga": "NBA",
+      "local": "Indiana Pacers",
+      "visitante": "Phoenix Suns",
+      "odds": {
+        "h2h": {
+          "Indiana Pacers": 3.9,
+          "Phoenix Suns": 1.28
+        },
+        "spreads": {
+          "Indiana Pacers": {
+            "price": 1.88,
+            "point": 9.0
+          },
+          "Phoenix Suns": {
+            "price": 1.94,
+            "point": -9.0
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.94,
+            "point": 224.5
+          },
+          "Under": {
+            "price": 1.88,
+            "point": 224.5
+          }
+        }
+      }
+    },
+    {
+      "liga": "NBA",
+      "local": "Orlando Magic",
+      "visitante": "Washington Wizards",
+      "odds": {
+        "h2h": {
+          "Orlando Magic": 1.1,
+          "Washington Wizards": 7.6
+        },
+        "spreads": {
+          "Orlando Magic": {
+            "price": 1.91,
+            "point": -14.5
+          },
+          "Washington Wizards": {
+            "price": 1.91,
+            "point": 14.5
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.91,
+            "point": 233.5
+          },
+          "Under": {
+            "price": 1.91,
+            "point": 233.5
+          }
+        }
+      }
+    },
+    {
+      "liga": "NBA",
+      "local": "Atlanta Hawks",
+      "visitante": "Brooklyn Nets",
+      "odds": {
+        "h2h": {
+          "Atlanta Hawks": 1.09,
+          "Brooklyn Nets": 8.3
+        },
+        "spreads": {
+          "Atlanta Hawks": {
+            "price": 1.89,
+            "point": -15.0
+          },
+          "Brooklyn Nets": {
+            "price": 1.93,
+            "point": 15.0
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.88,
+            "point": 226.5
+          },
+          "Under": {
+            "price": 1.94,
+            "point": 226.5
+          }
+        }
+      }
+    },
+    {
+      "liga": "NBA",
+      "local": "Miami Heat",
+      "visitante": "Milwaukee Bucks",
+      "odds": {
+        "h2h": {
+          "Miami Heat": 1.37,
+          "Milwaukee Bucks": 3.2
+        },
+        "spreads": {
+          "Miami Heat": {
+            "price": 1.89,
+            "point": -6.5
+          },
+          "Milwaukee Bucks": {
+            "price": 1.93,
+            "point": 6.5
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.88,
+            "point": 234.5
+          },
+          "Under": {
+            "price": 1.94,
+            "point": 234.5
+          }
+        }
+      }
+    },
+    {
+      "liga": "NBA",
+      "local": "Memphis Grizzlies",
+      "visitante": "Dallas Mavericks",
+      "odds": {
+        "h2h": {
+          "Dallas Mavericks": 1.5,
+          "Memphis Grizzlies": 2.68
+        },
+        "spreads": {
+          "Dallas Mavericks": {
+            "price": 1.87,
+            "point": -4.5
+          },
+          "Memphis Grizzlies": {
+            "price": 1.95,
+            "point": 4.5
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.91,
+            "point": 239.5
+          },
+          "Under": {
+            "price": 1.91,
+            "point": 239.5
+          }
+        }
+      }
+    },
+    {
+      "liga": "NBA",
+      "local": "San Antonio Spurs",
+      "visitante": "Denver Nuggets",
+      "odds": {
+        "h2h": {
+          "Denver Nuggets": 2.94,
+          "San Antonio Spurs": 1.43
+        },
+        "spreads": {
+          "Denver Nuggets": {
+            "price": 1.89,
+            "point": 6.0
+          },
+          "San Antonio Spurs": {
+            "price": 1.93,
+            "point": -6.0
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.88,
+            "point": 238.5
+          },
+          "Under": {
+            "price": 1.94,
+            "point": 238.5
+          }
+        }
+      }
+    },
+    {
+      "liga": "NBA",
+      "local": "Oklahoma City Thunder",
+      "visitante": "Boston Celtics",
+      "odds": {
+        "h2h": {
+          "Boston Celtics": 3.1,
+          "Oklahoma City Thunder": 1.39
+        },
+        "spreads": {
+          "Boston Celtics": {
+            "price": 1.94,
+            "point": 6.5
+          },
+          "Oklahoma City Thunder": {
+            "price": 1.88,
+            "point": -6.5
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.89,
+            "point": 215.5
+          },
+          "Under": {
+            "price": 1.93,
+            "point": 215.5
+          }
+        }
+      }
+    },
+    {
+      "liga": "NBA",
+      "local": "Los Angeles Lakers",
+      "visitante": "Chicago Bulls",
+      "odds": {
+        "h2h": {
+          "Chicago Bulls": 5.4,
+          "Los Angeles Lakers": 1.17
+        },
+        "spreads": {
+          "Chicago Bulls": {
+            "price": 1.93,
+            "point": 11.0
+          },
+          "Los Angeles Lakers": {
+            "price": 1.89,
+            "point": -11.0
+          }
+        },
+        "totals": {
+          "Over": {
+            "price": 1.93,
+            "point": 239.5
+          },
+          "Under": {
+            "price": 1.89,
+            "point": 239.5
+          }
+        }
+      }
+    }
+  ]
+}

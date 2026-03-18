@@ -1,0 +1,69 @@
+liga,equipo,xg_local,xg_visitante,gf_local,gf_visitante
+LIGA_MX,América,2.1,1.8,2.0,1.7
+LIGA_MX,UANL,2.2,1.9,2.1,1.8
+LIGA_MX,Monterrey,2.1,1.8,2.0,1.7
+LIGA_MX,Guadalajara,1.8,1.5,1.7,1.4
+LIGA_MX,Toluca,1.9,1.6,1.8,1.5
+LIGA_MX,Pachuca,2.0,1.7,1.9,1.6
+LIGA_MX,León,1.9,1.6,1.8,1.5
+LIGA_MX,Pumas,1.8,1.5,1.7,1.4
+LIGA_MX,Atlas,1.7,1.4,1.6,1.3
+LIGA_MX,Atlético San Luis,1.6,1.3,1.5,1.2
+LIGA_MX,Querétaro,1.5,1.2,1.4,1.1
+LIGA_MX,Juárez,1.5,1.2,1.4,1.1
+LIGA_MX,Tijuana,1.6,1.3,1.5,1.2
+LIGA_MX,Mazatlán,1.5,1.2,1.4,1.1
+LIGA_MX,Puebla,1.6,1.3,1.5,1.2
+LIGA_MX,Necaxa,1.5,1.2,1.4,1.1
+LIGA_MX,Santos Laguna,1.7,1.4,1.6,1.3
+LIGA_MX,Cruz Azul,1.9,1.6,1.8,1.5
+PREMIER_LEAGUE,Manchester City,2.6,2.3,2.5,2.2
+PREMIER_LEAGUE,Liverpool,2.5,2.2,2.4,2.1
+PREMIER_LEAGUE,Arsenal,2.3,2.0,2.2,1.9
+PREMIER_LEAGUE,Manchester United,2.1,1.8,2.0,1.7
+PREMIER_LEAGUE,Chelsea,2.0,1.7,1.9,1.6
+PREMIER_LEAGUE,Tottenham,2.2,1.9,2.1,1.8
+PREMIER_LEAGUE,Newcastle,1.9,1.6,1.8,1.5
+PREMIER_LEAGUE,Aston Villa,1.9,1.6,1.8,1.5
+PREMIER_LEAGUE,Brighton,1.8,1.5,1.7,1.4
+PREMIER_LEAGUE,West Ham,1.7,1.4,1.6,1.3
+LA_LIGA,Real Madrid,2.5,2.2,2.4,2.1
+LA_LIGA,Barcelona,2.4,2.1,2.3,2.0
+LA_LIGA,Atlético Madrid,2.0,1.7,1.9,1.6
+LA_LIGA,Real Sociedad,1.9,1.6,1.8,1.5
+LA_LIGA,Athletic Club,1.8,1.5,1.7,1.4
+LA_LIGA,Betis,1.8,1.5,1.7,1.4
+LA_LIGA,Villarreal,1.9,1.6,1.8,1.5
+LA_LIGA,Valencia,1.6,1.3,1.5,1.2
+LA_LIGA,Sevilla,1.7,1.4,1.6,1.3
+BUNDESLIGA,Bayern Munich,2.7,2.4,2.6,2.3
+BUNDESLIGA,Dortmund,2.3,2.0,2.2,1.9
+BUNDESLIGA,Leverkusen,2.2,1.9,2.1,1.8
+BUNDESLIGA,Leipzig,2.1,1.8,2.0,1.7
+BUNDESLIGA,Eintracht Frankfurt,1.9,1.6,1.8,1.5
+BUNDESLIGA,Stuttgart,1.9,1.6,1.8,1.5
+SERIE_A,Inter,2.2,1.9,2.1,1.8
+SERIE_A,Milan,2.1,1.8,2.0,1.7
+SERIE_A,Juventus,2.0,1.7,1.9,1.6
+SERIE_A,Napoli,2.0,1.7,1.9,1.6
+SERIE_A,Atalanta,2.1,1.8,2.0,1.7
+SERIE_A,Roma,1.9,1.6,1.8,1.5
+SERIE_A,Lazio,1.9,1.6,1.8,1.5
+LIGUE_1,PSG,2.4,2.1,2.3,2.0
+LIGUE_1,Marseille,2.0,1.7,1.9,1.6
+LIGUE_1,Lyon,1.9,1.6,1.8,1.5
+LIGUE_1,Monaco,1.9,1.6,1.8,1.5
+LIGUE_1,Lille,1.8,1.5,1.7,1.4
+EREDIVISIE,Ajax,2.3,2.0,2.2,1.9
+EREDIVISIE,PSV,2.2,1.9,2.1,1.8
+EREDIVISIE,Feyenoord,2.1,1.8,2.0,1.7
+EREDIVISIE,AZ,1.9,1.6,1.8,1.5
+EREDIVISIE,Twente,1.8,1.5,1.7,1.4
+PRIMEIRA_LIGA,Benfica,2.2,1.9,2.1,1.8
+PRIMEIRA_LIGA,Sporting CP,2.1,1.8,2.0,1.7
+PRIMEIRA_LIGA,Porto,2.0,1.7,1.9,1.6
+PRIMEIRA_LIGA,Braga,1.8,1.5,1.7,1.4
+TURKEY_SUPER_LIG,Galatasaray,2.1,1.8,2.0,1.7
+TURKEY_SUPER_LIG,Fenerbahçe,2.0,1.7,1.9,1.6
+TURKEY_SUPER_LIG,Beşiktaş,1.9,1.6,1.8,1.5
+TURKEY_SUPER_LIG,Trabzonspor,1.8,1.5,1.7,1.4

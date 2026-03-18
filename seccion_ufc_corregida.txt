@@ -1,0 +1,47 @@
+﻿    # ============================================
+    # PESTAÑA UFC - VERSIÓN CORREGIDA
+    # ============================================
+    with tab2:  # UFC
+        if st.session_state.ufc_combates:
+            st.write(f"✅ {len(st.session_state.ufc_combates)} combates encontrados")
+            
+            for idx, c in enumerate(st.session_state.ufc_combates):
+                # Obtener nombres de forma segura
+                peleador1 = c.get('peleador1', {})
+                peleador2 = c.get('peleador2', {})
+                
+                if isinstance(peleador1, dict):
+                    p1_nombre = peleador1.get('nombre', f'Peleador {idx+1}')
+                else:
+                    p1_nombre = str(peleador1)
+                    
+                if isinstance(peleador2, dict):
+                    p2_nombre = peleador2.get('nombre', f'Peleador {idx+2}')
+                else:
+                    p2_nombre = str(peleador2)
+                
+                key = f"ufc_{idx}_{p1_nombre}_{p2_nombre}"
+                
+                # Renderizar
+                accion = st.session_state.visual_ufc.render(
+                    c, idx,
+                    tracker=st.session_state.tracker,
+                    analisis=st.session_state.ufc_analisis.get(key)
+                )
+                
+                # Si el usuario hace clic en ANALIZAR
+                if accion == "analizar":
+                    with st.spinner(f"🔍 Analizando {p1_nombre} vs {p2_nombre}..."):
+                        stats = st.session_state.ufc_stats.obtener_datos_combate(p1_nombre, p2_nombre)
+                        
+                        if stats:
+                            from analizador_ufc import AnalizadorUFC
+                            analizador = AnalizadorUFC(stats['peleador1'], stats['peleador2'])
+                            recomendacion = analizador.analizar()
+                            
+                            st.session_state.ufc_analisis[key] = recomendacion
+                            st.rerun()
+                        else:
+                            st.error("No se pudieron obtener estadísticas")
+        else:
+            st.info("👈 Carga UFC en el sidebar")

@@ -1,0 +1,69 @@
+{
+  "timestamp": "2026-03-12T09:03:49.324482",
+  "partidos": [
+    {
+      "liga": "BELGIUM FIRST DIV",
+      "local": "Gent",
+      "visitante": "SV Zulte-Waregem",
+      "odds_local": 1.94,
+      "odds_empate": 3.55,
+      "odds_visitante": 3.4
+    },
+    {
+      "liga": "BELGIUM FIRST DIV",
+      "local": "Charleroi",
+      "visitante": "Leuven",
+      "odds_local": 1.85,
+      "odds_empate": 3.65,
+      "odds_visitante": 4.2
+    },
+    {
+      "liga": "BELGIUM FIRST DIV",
+      "local": "Union Saint-Gilloise",
+      "visitante": "Dender",
+      "odds_local": 1.26,
+      "odds_empate": 5.8,
+      "odds_visitante": 11.0
+    },
+    {
+      "liga": "BELGIUM FIRST DIV",
+      "local": "Westerlo",
+      "visitante": "Club Brugge",
+      "odds_local": 5.0,
+      "odds_empate": 4.4,
+      "odds_visitante": 1.61
+    },
+    {
+      "liga": "BELGIUM FIRST DIV",
+      "local": "Genk",
+      "visitante": "Sint Truiden",
+      "odds_local": 2.12,
+      "odds_empate": 3.7,
+      "odds_visitante": 3.05
+    },
+    {
+      "liga": "BELGIUM FIRST DIV",
+      "local": "Royal Antwerp",
+      "visitante": "Standard Liege",
+      "odds_local": 2.1,
+      "odds_empate": 3.3,
+      "odds_visitante": 3.45
+    },
+    {
+      "liga": "BELGIUM FIRST DIV",
+      "local": "KV Mechelen",
+      "visitante": "Anderlecht",
+      "odds_local": 3.45,
+      "odds_empate": 3.65,
+      "odds_visitante": 2.04
+    },
+    {
+      "liga": "BELGIUM FIRST DIV",
+      "local": "Cercle Brugge KSV",
+      "visitante": "RAAL La Louvi\u00e8re",
+      "odds_local": 1.85,
+      "odds_empate": 3.45,
+      "odds_visitante": 3.9
+    }
+  ]
+}

@@ -1,0 +1,149 @@
+{
+  "timestamp": "2026-03-12T09:03:46.846198",
+  "partidos": [
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Borussia Monchengladbach",
+      "visitante": "FC St. Pauli",
+      "odds_local": 1.94,
+      "odds_empate": 3.35,
+      "odds_visitante": 3.85
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Eintracht Frankfurt",
+      "visitante": "1. FC Heidenheim",
+      "odds_local": 1.57,
+      "odds_empate": 4.72,
+      "odds_visitante": 5.94
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Borussia Dortmund",
+      "visitante": "Augsburg",
+      "odds_local": 1.46,
+      "odds_empate": 5.13,
+      "odds_visitante": 7.31
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Bayer Leverkusen",
+      "visitante": "Bayern Munich",
+      "odds_local": 5.0,
+      "odds_empate": 4.65,
+      "odds_visitante": 1.52
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "TSG Hoffenheim",
+      "visitante": "VfL Wolfsburg",
+      "odds_local": 1.5,
+      "odds_empate": 5.08,
+      "odds_visitante": 6.5
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Hamburger SV",
+      "visitante": "1. FC K\u00f6ln",
+      "odds_local": 2.19,
+      "odds_empate": 3.67,
+      "odds_visitante": 3.48
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Werder Bremen",
+      "visitante": "FSV Mainz 05",
+      "odds_local": 2.2,
+      "odds_empate": 3.5,
+      "odds_visitante": 2.95
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "SC Freiburg",
+      "visitante": "Union Berlin",
+      "odds_local": 2.1,
+      "odds_empate": 3.3,
+      "odds_visitante": 3.3
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "VfB Stuttgart",
+      "visitante": "RB Leipzig",
+      "odds_local": 2.33,
+      "odds_empate": 4.01,
+      "odds_visitante": 2.97
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "RB Leipzig",
+      "visitante": "TSG Hoffenheim",
+      "odds_local": 1.91,
+      "odds_empate": 3.75,
+      "odds_visitante": 3.4
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "1. FC Heidenheim",
+      "visitante": "Bayer Leverkusen",
+      "odds_local": 4.7,
+      "odds_empate": 4.2,
+      "odds_visitante": 1.5
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "1. FC K\u00f6ln",
+      "visitante": "Borussia Monchengladbach",
+      "odds_local": 2.25,
+      "odds_empate": 3.4,
+      "odds_visitante": 2.9
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Bayern Munich",
+      "visitante": "Union Berlin",
+      "odds_local": 1.17,
+      "odds_empate": 7.5,
+      "odds_visitante": 12.0
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "VfL Wolfsburg",
+      "visitante": "Werder Bremen",
+      "odds_local": 2.69,
+      "odds_empate": 3.78,
+      "odds_visitante": 2.63
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Borussia Dortmund",
+      "visitante": "Hamburger SV",
+      "odds_local": 1.35,
+      "odds_empate": 4.8,
+      "odds_visitante": 5.9
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "FSV Mainz 05",
+      "visitante": "Eintracht Frankfurt",
+      "odds_local": 2.05,
+      "odds_empate": 3.5,
+      "odds_visitante": 2.9
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "FC St. Pauli",
+      "visitante": "SC Freiburg",
+      "odds_local": 2.35,
+      "odds_empate": 3.1,
+      "odds_visitante": 2.7
+    },
+    {
+      "liga": "GERMANY BUNDESLIGA",
+      "local": "Augsburg",
+      "visitante": "VfB Stuttgart",
+      "odds_local": 3.25,
+      "odds_empate": 3.7,
+      "odds_visitante": 1.84
+    }
+  ]
+}

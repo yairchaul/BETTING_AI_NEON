@@ -1,22 +1,39 @@
-﻿# Entorno virtual
-venv/
-env/
-ENV/
-
-# Python
+﻿# Python
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.so
+*.dll
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.env.local
+.venv
 
 # API Keys
 .env
-.streamlit/secrets.toml
+*.env
+
+# Cache folders
+cache_*/
+*.cache
+
+# Streamlit
+.streamlit/
 
 # IDE
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Datos locales
-*.json
-!n8n_workflow.json
+# Backups
+backup_*/
+*.bak
+*.backup
+
+# Logs
+*.log

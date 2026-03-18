@@ -1,0 +1,496 @@
+{
+  "LIGA_MX": [
+    {
+      "nombre": "América",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "UANL",
+      "xg_local": 2.2,
+      "xg_visitante": 1.9,
+      "gf_local": 2.1,
+      "gf_visitante": 1.8
+    },
+    {
+      "nombre": "Monterrey",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "Guadalajara",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    },
+    {
+      "nombre": "Toluca",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Pachuca",
+      "xg_local": 2.0,
+      "xg_visitante": 1.7,
+      "gf_local": 1.9,
+      "gf_visitante": 1.6
+    },
+    {
+      "nombre": "León",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Pumas",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    },
+    {
+      "nombre": "Atlas",
+      "xg_local": 1.7,
+      "xg_visitante": 1.4,
+      "gf_local": 1.6,
+      "gf_visitante": 1.3
+    },
+    {
+      "nombre": "Atlético San Luis",
+      "xg_local": 1.6,
+      "xg_visitante": 1.3,
+      "gf_local": 1.5,
+      "gf_visitante": 1.2
+    },
+    {
+      "nombre": "Querétaro",
+      "xg_local": 1.5,
+      "xg_visitante": 1.2,
+      "gf_local": 1.4,
+      "gf_visitante": 1.1
+    },
+    {
+      "nombre": "Juárez",
+      "xg_local": 1.5,
+      "xg_visitante": 1.2,
+      "gf_local": 1.4,
+      "gf_visitante": 1.1
+    },
+    {
+      "nombre": "Tijuana",
+      "xg_local": 1.6,
+      "xg_visitante": 1.3,
+      "gf_local": 1.5,
+      "gf_visitante": 1.2
+    },
+    {
+      "nombre": "Mazatlán",
+      "xg_local": 1.5,
+      "xg_visitante": 1.2,
+      "gf_local": 1.4,
+      "gf_visitante": 1.1
+    },
+    {
+      "nombre": "Puebla",
+      "xg_local": 1.6,
+      "xg_visitante": 1.3,
+      "gf_local": 1.5,
+      "gf_visitante": 1.2
+    },
+    {
+      "nombre": "Necaxa",
+      "xg_local": 1.5,
+      "xg_visitante": 1.2,
+      "gf_local": 1.4,
+      "gf_visitante": 1.1
+    },
+    {
+      "nombre": "Santos Laguna",
+      "xg_local": 1.7,
+      "xg_visitante": 1.4,
+      "gf_local": 1.6,
+      "gf_visitante": 1.3
+    },
+    {
+      "nombre": "Cruz Azul",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    }
+  ],
+  "PREMIER_LEAGUE": [
+    {
+      "nombre": "Manchester City",
+      "xg_local": 2.6,
+      "xg_visitante": 2.3,
+      "gf_local": 2.5,
+      "gf_visitante": 2.2
+    },
+    {
+      "nombre": "Liverpool",
+      "xg_local": 2.5,
+      "xg_visitante": 2.2,
+      "gf_local": 2.4,
+      "gf_visitante": 2.1
+    },
+    {
+      "nombre": "Arsenal",
+      "xg_local": 2.3,
+      "xg_visitante": 2.0,
+      "gf_local": 2.2,
+      "gf_visitante": 1.9
+    },
+    {
+      "nombre": "Manchester United",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "Chelsea",
+      "xg_local": 2.0,
+      "xg_visitante": 1.7,
+      "gf_local": 1.9,
+      "gf_visitante": 1.6
+    },
+    {
+      "nombre": "Tottenham",
+      "xg_local": 2.2,
+      "xg_visitante": 1.9,
+      "gf_local": 2.1,
+      "gf_visitante": 1.8
+    },
+    {
+      "nombre": "Newcastle",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Aston Villa",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Brighton",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    },
+    {
+      "nombre": "West Ham",
+      "xg_local": 1.7,
+      "xg_visitante": 1.4,
+      "gf_local": 1.6,
+      "gf_visitante": 1.3
+    }
+  ],
+  "LA_LIGA": [
+    {
+      "nombre": "Real Madrid",
+      "xg_local": 2.5,
+      "xg_visitante": 2.2,
+      "gf_local": 2.4,
+      "gf_visitante": 2.1
+    },
+    {
+      "nombre": "Barcelona",
+      "xg_local": 2.4,
+      "xg_visitante": 2.1,
+      "gf_local": 2.3,
+      "gf_visitante": 2.0
+    },
+    {
+      "nombre": "Atlético Madrid",
+      "xg_local": 2.0,
+      "xg_visitante": 1.7,
+      "gf_local": 1.9,
+      "gf_visitante": 1.6
+    },
+    {
+      "nombre": "Real Sociedad",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Athletic Club",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    },
+    {
+      "nombre": "Betis",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    },
+    {
+      "nombre": "Villarreal",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Valencia",
+      "xg_local": 1.6,
+      "xg_visitante": 1.3,
+      "gf_local": 1.5,
+      "gf_visitante": 1.2
+    },
+    {
+      "nombre": "Sevilla",
+      "xg_local": 1.7,
+      "xg_visitante": 1.4,
+      "gf_local": 1.6,
+      "gf_visitante": 1.3
+    }
+  ],
+  "BUNDESLIGA": [
+    {
+      "nombre": "Bayern Munich",
+      "xg_local": 2.7,
+      "xg_visitante": 2.4,
+      "gf_local": 2.6,
+      "gf_visitante": 2.3
+    },
+    {
+      "nombre": "Dortmund",
+      "xg_local": 2.3,
+      "xg_visitante": 2.0,
+      "gf_local": 2.2,
+      "gf_visitante": 1.9
+    },
+    {
+      "nombre": "Leverkusen",
+      "xg_local": 2.2,
+      "xg_visitante": 1.9,
+      "gf_local": 2.1,
+      "gf_visitante": 1.8
+    },
+    {
+      "nombre": "Leipzig",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "Eintracht Frankfurt",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Stuttgart",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    }
+  ],
+  "SERIE_A": [
+    {
+      "nombre": "Inter",
+      "xg_local": 2.2,
+      "xg_visitante": 1.9,
+      "gf_local": 2.1,
+      "gf_visitante": 1.8
+    },
+    {
+      "nombre": "Milan",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "Juventus",
+      "xg_local": 2.0,
+      "xg_visitante": 1.7,
+      "gf_local": 1.9,
+      "gf_visitante": 1.6
+    },
+    {
+      "nombre": "Napoli",
+      "xg_local": 2.0,
+      "xg_visitante": 1.7,
+      "gf_local": 1.9,
+      "gf_visitante": 1.6
+    },
+    {
+      "nombre": "Atalanta",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "Roma",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Lazio",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    }
+  ],
+  "LIGUE_1": [
+    {
+      "nombre": "PSG",
+      "xg_local": 2.4,
+      "xg_visitante": 2.1,
+      "gf_local": 2.3,
+      "gf_visitante": 2.0
+    },
+    {
+      "nombre": "Marseille",
+      "xg_local": 2.0,
+      "xg_visitante": 1.7,
+      "gf_local": 1.9,
+      "gf_visitante": 1.6
+    },
+    {
+      "nombre": "Lyon",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Monaco",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Lille",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    }
+  ],
+  "EREDIVISIE": [
+    {
+      "nombre": "Ajax",
+      "xg_local": 2.3,
+      "xg_visitante": 2.0,
+      "gf_local": 2.2,
+      "gf_visitante": 1.9
+    },
+    {
+      "nombre": "PSV",
+      "xg_local": 2.2,
+      "xg_visitante": 1.9,
+      "gf_local": 2.1,
+      "gf_visitante": 1.8
+    },
+    {
+      "nombre": "Feyenoord",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "AZ",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Twente",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    }
+  ],
+  "PRIMEIRA_LIGA": [
+    {
+      "nombre": "Benfica",
+      "xg_local": 2.2,
+      "xg_visitante": 1.9,
+      "gf_local": 2.1,
+      "gf_visitante": 1.8
+    },
+    {
+      "nombre": "Sporting CP",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "Porto",
+      "xg_local": 2.0,
+      "xg_visitante": 1.7,
+      "gf_local": 1.9,
+      "gf_visitante": 1.6
+    },
+    {
+      "nombre": "Braga",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    }
+  ],
+  "TURKEY_SUPER_LIG": [
+    {
+      "nombre": "Galatasaray",
+      "xg_local": 2.1,
+      "xg_visitante": 1.8,
+      "gf_local": 2.0,
+      "gf_visitante": 1.7
+    },
+    {
+      "nombre": "Fenerbahçe",
+      "xg_local": 2.0,
+      "xg_visitante": 1.7,
+      "gf_local": 1.9,
+      "gf_visitante": 1.6
+    },
+    {
+      "nombre": "Beşiktaş",
+      "xg_local": 1.9,
+      "xg_visitante": 1.6,
+      "gf_local": 1.8,
+      "gf_visitante": 1.5
+    },
+    {
+      "nombre": "Trabzonspor",
+      "xg_local": 1.8,
+      "xg_visitante": 1.5,
+      "gf_local": 1.7,
+      "gf_visitante": 1.4
+    }
+  ]
+}

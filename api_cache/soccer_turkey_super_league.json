@@ -1,0 +1,117 @@
+{
+  "timestamp": "2026-03-12T09:03:49.820225",
+  "partidos": [
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Antalyaspor",
+      "visitante": "Gazi\u015fehir Gaziantep",
+      "odds_local": 2.37,
+      "odds_empate": 3.2,
+      "odds_visitante": 2.93
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Fatih Karag\u00fcmr\u00fck",
+      "visitante": "Fenerbahce",
+      "odds_local": 8.0,
+      "odds_empate": 4.7,
+      "odds_visitante": 1.35
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Kocaelispor",
+      "visitante": "Torku Konyaspor",
+      "odds_local": 2.33,
+      "odds_empate": 2.84,
+      "odds_visitante": 3.39
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Goztepe",
+      "visitante": "Alanyaspor",
+      "odds_local": 2.05,
+      "odds_empate": 3.35,
+      "odds_visitante": 3.5
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Galatasaray",
+      "visitante": "Basaksehir",
+      "odds_local": 1.63,
+      "odds_empate": 4.22,
+      "odds_visitante": 4.44
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Trabzonspor",
+      "visitante": "\u00c7aykur Rizespor",
+      "odds_local": 1.68,
+      "odds_empate": 3.9,
+      "odds_visitante": 4.4
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Kasimpasa SK",
+      "visitante": "Ey\u00fcpspor",
+      "odds_local": 1.81,
+      "odds_empate": 3.55,
+      "odds_visitante": 4.1
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Genclerbirligi SK",
+      "visitante": "Besiktas JK",
+      "odds_local": 4.5,
+      "odds_empate": 3.9,
+      "odds_visitante": 1.67
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Samsunspor",
+      "visitante": "Kayserispor",
+      "odds_local": 2.12,
+      "odds_empate": 3.57,
+      "odds_visitante": 3.09
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Fenerbahce",
+      "visitante": "Gazi\u015fehir Gaziantep",
+      "odds_local": 1.24,
+      "odds_empate": 5.8,
+      "odds_visitante": 10.0
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Alanyaspor",
+      "visitante": "Kocaelispor",
+      "odds_local": 2.3,
+      "odds_empate": 3.2,
+      "odds_visitante": 3.1
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Basaksehir",
+      "visitante": "Antalyaspor",
+      "odds_local": 1.41,
+      "odds_empate": 4.6,
+      "odds_visitante": 6.75
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Ey\u00fcpspor",
+      "visitante": "Trabzonspor",
+      "odds_local": 4.75,
+      "odds_empate": 3.95,
+      "odds_visitante": 1.63
+    },
+    {
+      "liga": "TURKEY SUPER LEAGUE",
+      "local": "Kayserispor",
+      "visitante": "Fatih Karag\u00fcmr\u00fck",
+      "odds_local": 1.93,
+      "odds_empate": 3.5,
+      "odds_visitante": 3.65
+    }
+  ]
+}

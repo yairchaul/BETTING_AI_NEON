@@ -1,0 +1,69 @@
+{
+  "timestamp": "2026-03-12T09:03:48.839291",
+  "partidos": [
+    {
+      "liga": "PORTUGAL PRIMEIRA LIGA",
+      "local": "Vit\u00f3ria SC",
+      "visitante": "Famalic\u00e3o",
+      "odds_local": 2.38,
+      "odds_empate": 3.25,
+      "odds_visitante": 2.88
+    },
+    {
+      "liga": "PORTUGAL PRIMEIRA LIGA",
+      "local": "Gil Vicente",
+      "visitante": "Alverca",
+      "odds_local": 1.64,
+      "odds_empate": 3.7,
+      "odds_visitante": 4.9
+    },
+    {
+      "liga": "PORTUGAL PRIMEIRA LIGA",
+      "local": "Arouca",
+      "visitante": "Benfica",
+      "odds_local": 9.5,
+      "odds_empate": 5.1,
+      "odds_visitante": 1.27
+    },
+    {
+      "liga": "PORTUGAL PRIMEIRA LIGA",
+      "local": "AVS Futebol SAD",
+      "visitante": "Santa Clara",
+      "odds_local": 4.2,
+      "odds_empate": 3.25,
+      "odds_visitante": 1.88
+    },
+    {
+      "liga": "PORTUGAL PRIMEIRA LIGA",
+      "local": "Nacional",
+      "visitante": "Estoril",
+      "odds_local": 2.43,
+      "odds_empate": 3.45,
+      "odds_visitante": 2.7
+    },
+    {
+      "liga": "PORTUGAL PRIMEIRA LIGA",
+      "local": "Sporting Lisbon",
+      "visitante": "Tondela",
+      "odds_local": 1.14,
+      "odds_empate": 7.0,
+      "odds_visitante": 21.0
+    },
+    {
+      "liga": "PORTUGAL PRIMEIRA LIGA",
+      "local": "Rio Ave FC",
+      "visitante": "CF Estrela",
+      "odds_local": 2.4,
+      "odds_empate": 3.3,
+      "odds_visitante": 2.7
+    },
+    {
+      "liga": "PORTUGAL PRIMEIRA LIGA",
+      "local": "FC Porto",
+      "visitante": "Moreirense FC",
+      "odds_local": 1.18,
+      "odds_empate": 5.8,
+      "odds_visitante": 14.0
+    }
+  ]
+}
