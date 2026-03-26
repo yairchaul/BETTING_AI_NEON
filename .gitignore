@@ -3,27 +3,18 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.Python
 *.so
-*.dll
+*.egg
+*.egg-info/
+dist/
+build/
 
 # Virtual Environment
+.venv/
 venv/
-env/
 ENV/
-.venv
-
-# API Keys
-.env
-*.env
-
-# Data folders
-ufc_data/
-cache_*/
-*.cache
-*.db
-
-# Streamlit
-.streamlit/
+env/
 
 # IDE
 .vscode/
@@ -31,14 +22,25 @@ cache_*/
 *.swp
 *.swo
 
-# Backups
-backup_*/
-*.bak
-*.backup
-
-# Logs
+# Datos locales (no subir la BD)
+data/betting_stats.db
+data/bitacora*.csv
 *.log
+debug_*.html
+debug_*.json
 
-# JSON data files (user generated)
-*.json
-!requirements.txt
+# Archivos de prueba
+test_*.py
+test_*.txt
+inspeccion_*.py
+
+# Respaldos
+backups_definitivos/
+*.bak
+
+# Environment variables (no subir API keys)
+.env
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,244 @@
+[
+  {
+    "local": "New York Mets",
+    "visitante": "Pittsburgh Pirates",
+    "fecha": "2026-03-26",
+    "hora": "17:15",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 8.5,
+      "spread": {
+        "local": "N/A",
+        "visitante": "N/A"
+      },
+      "moneyline": {
+        "local": "N/A",
+        "visitante": "N/A"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "Milwaukee Brewers",
+    "visitante": "Chicago White Sox",
+    "fecha": "2026-03-26",
+    "hora": "18:10",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 8.5,
+      "spread": {
+        "local": "N/A",
+        "visitante": "N/A"
+      },
+      "moneyline": {
+        "local": "N/A",
+        "visitante": "N/A"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "Chicago Cubs",
+    "visitante": "Washington Nationals",
+    "fecha": "2026-03-26",
+    "hora": "18:20",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 8.5,
+      "spread": {
+        "local": "N/A",
+        "visitante": "N/A"
+      },
+      "moneyline": {
+        "local": "N/A",
+        "visitante": "N/A"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "Baltimore Orioles",
+    "visitante": "Minnesota Twins",
+    "fecha": "2026-03-26",
+    "hora": "19:05",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 8.5,
+      "spread": {
+        "local": -1.5,
+        "visitante": 1.5
+      },
+      "moneyline": {
+        "local": "-145",
+        "visitante": "+120"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "Cincinnati Reds",
+    "visitante": "Boston Red Sox",
+    "fecha": "2026-03-26",
+    "hora": "20:10",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 8.0,
+      "spread": {
+        "local": 1.5,
+        "visitante": -1.5
+      },
+      "moneyline": {
+        "local": "+129",
+        "visitante": "-156"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "Houston Astros",
+    "visitante": "Los Angeles Angels",
+    "fecha": "2026-03-26",
+    "hora": "20:10",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 8.0,
+      "spread": {
+        "local": -1.5,
+        "visitante": 1.5
+      },
+      "moneyline": {
+        "local": "-181",
+        "visitante": "+149"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "San Diego Padres",
+    "visitante": "Detroit Tigers",
+    "fecha": "2026-03-26",
+    "hora": "20:10",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 7.0,
+      "spread": {
+        "local": 1.5,
+        "visitante": -1.5
+      },
+      "moneyline": {
+        "local": "+104",
+        "visitante": "-126"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "Philadelphia Phillies",
+    "visitante": "Texas Rangers",
+    "fecha": "2026-03-26",
+    "hora": "20:15",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 8.0,
+      "spread": {
+        "local": -1.5,
+        "visitante": 1.5
+      },
+      "moneyline": {
+        "local": "-175",
+        "visitante": "+144"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "St. Louis Cardinals",
+    "visitante": "Tampa Bay Rays",
+    "fecha": "2026-03-26",
+    "hora": "20:15",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 8.0,
+      "spread": {
+        "local": 1.5,
+        "visitante": -1.5
+      },
+      "moneyline": {
+        "local": "+109",
+        "visitante": "-131"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "Los Angeles Dodgers",
+    "visitante": "Arizona Diamondbacks",
+    "fecha": "2026-03-27",
+    "hora": "00:30",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 9.0,
+      "spread": {
+        "local": -1.5,
+        "visitante": 1.5
+      },
+      "moneyline": {
+        "local": "-280",
+        "visitante": "+224"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  },
+  {
+    "local": "Seattle Mariners",
+    "visitante": "Cleveland Guardians",
+    "fecha": "2026-03-27",
+    "hora": "02:10",
+    "lanzadores": "",
+    "odds": {
+      "over_under": 6.5,
+      "spread": {
+        "local": -1.5,
+        "visitante": 1.5
+      },
+      "moneyline": {
+        "local": "-186",
+        "visitante": "+153"
+      }
+    },
+    "records": {
+      "local": "0-0",
+      "visitante": "0-0"
+    }
+  }
+]
