@@ -1,179 +1,131 @@
-﻿"""
-VISUAL NBA MEJORADO - Muestra TODAS las cuotas correctamente
-"""
+﻿# -*- coding: utf-8 -*-
 import streamlit as st
 
 class VisualNBAMejorado:
     def __init__(self):
-        self.colores = {
-            'local': '#FF6B35',
-            'visitante': '#0066CC',
-            'over': '#4CAF50',
-            'under': '#f44336',
-            'green': '#4CAF50',
-            'yellow': '#FFC107',
-            'blue': '#2196F3',
-            'red': '#f44336',
-            'orange': '#FF9800'
-        }
+        pass
     
-    def render(self, partido, idx, tracker=None, 
-               analisis_heurístico=None, 
-               analisis_gemini=None, 
-               analisis_premium=None):
+    def render(self, partido, idx, tracker, analisis_heuristico=None, analisis_gemini=None, analisis_premium=None):
+        """Renderiza partido NBA con estilo NEON"""
+        local = partido.get('local', '')
+        visitante = partido.get('visitante', '')
+        odds = partido.get('odds', {})
+        records = partido.get('records', {})
         
-        with st.container():
-            if idx > 0:
-                st.markdown("---")
-            
-            local = partido.get('local', 'Local')
-            visitante = partido.get('visitante', 'Visitante')
-            hora = partido.get('hora', '20:00')
-            odds = partido.get('odds', {})
-            records = partido.get('records', {})
-            
-            # Extraer valores de spread
-            spread_local = odds.get('spread', {}).get('valor', 0)
-            spread_visit = -spread_local  # El visitante es el opuesto
-            
-            # Extraer odds del spread y totales
-            spread_odds_local = odds.get('spread', {}).get('local_odds', 'N/A')
-            spread_odds_visit = odds.get('spread', {}).get('visitante_odds', 'N/A')
-            over_odds = odds.get('totales', {}).get('over_odds', 'N/A')
-            under_odds = odds.get('totales', {}).get('under_odds', 'N/A')
-            total_linea = odds.get('totales', {}).get('linea', 0)
-            
-            # Encabezado
-            st.markdown(f"""
-            <div style="background-color: #1E1E1E; padding: 15px; border-radius: 10px 10px 0 0; border-left: 5px solid #FF6B35;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="color: #FF6B35; font-weight: bold;">🏀 NBA</span>
-                    <span style="color: #888;">{hora}</span>
+        # Extraer datos
+        spread_local = odds.get('spread', {}).get('local', 'N/A')
+        spread_visit = odds.get('spread', {}).get('visitante', 'N/A')
+        over_under = odds.get('over_under', 'N/A')
+        ml_local = odds.get('moneyline', {}).get('local', 'N/A')
+        ml_visit = odds.get('moneyline', {}).get('visitante', 'N/A')
+        
+        # Estilo de tarjeta
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #0f0f1a 0%, #1a1f2a 100%); 
+                    border-radius: 15px; 
+                    padding: 20px; 
+                    margin: 15px 0; 
+                    border: 1px solid #00ff41;
+                    box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);'>
+            <div style='display: flex; justify-content: space-between; align-items: center;'>
+                <div style='text-align: center; flex: 1;'>
+                    <h2 style='color: #fff; text-shadow: 0 0 5px #ff6600; margin: 0;'>{local}</h2>
+                    <p style='color: #ff6600; margin: 0;'>{records.get('local', '0-0')}</p>
+                    <p style='color: #00ff41; font-size: 14px;'>ML: {ml_local}</p>
                 </div>
-                <h3 style="color: white; text-align: center; margin: 10px 0;">
-                    {local} <span style="color: #FFA500;">({records.get('local', '0-0')})</span> 
-                    <span style="color: #666;">VS</span> 
-                    {visitante} <span style="color: #FFA500;">({records.get('visitante', '0-0')})</span>
-                </h3>
+                <div style='text-align: center; flex: 0.5;'>
+                    <h1 style='color: #00ff41; text-shadow: 0 0 10px #00ff41; margin: 0;'>VS</h1>
+                </div>
+                <div style='text-align: center; flex: 1;'>
+                    <h2 style='color: #fff; text-shadow: 0 0 5px #ff6600; margin: 0;'>{visitante}</h2>
+                    <p style='color: #ff6600; margin: 0;'>{records.get('visitante', '0-0')}</p>
+                    <p style='color: #00ff41; font-size: 14px;'>ML: {ml_visit}</p>
+                </div>
+            </div>
+            <div style='display: flex; justify-content: center; gap: 30px; margin-top: 15px; padding-top: 10px; border-top: 1px solid #333;'>
+                <div style='text-align: center;'>
+                    <span style='color: #888; font-size: 12px;'>SPREAD</span>
+                    <p style='color: #fff; margin: 0;'>{local}: {spread_local} | {visitante}: {spread_visit}</p>
+                </div>
+                <div style='text-align: center;'>
+                    <span style='color: #888; font-size: 12px;'>OVER/UNDER</span>
+                    <p style='color: #fff; margin: 0;'>OVER {over_under} / UNDER {over_under}</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Botón ANALIZAR
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🔥 ANALIZAR CON MOTOR + GEMINI", key=f"analyze_nba_{idx}", use_container_width=True):
+                return "analizar"
+        
+        # Mostrar resultados si existen
+        if analisis_heuristico:
+            st.markdown("---")
+            
+            recomendacion = analisis_heuristico.get('recomendacion', 'N/A')
+            ev = analisis_heuristico.get('ev_mejor', 0)
+            confianza = analisis_heuristico.get('confianza', 0)
+            total_proyectado = analisis_heuristico.get('total_proyectado', 0)
+            detalle = analisis_heuristico.get('detalle', '')
+            etiqueta_verde = analisis_heuristico.get('etiqueta_verde', False)
+            
+            color_resultado = "#00ff41" if "OVER" in recomendacion or "GANA" in recomendacion else "#ff6600"
+            icono = "📈" if "OVER" in recomendacion else ("📉" if "UNDER" in recomendacion else "🎯")
+            
+            st.markdown(f"""
+            <div style='background: linear-gradient(135deg, #1a1f2a 0%, #0f1419 100%); 
+                        border-radius: 12px; 
+                        padding: 20px; 
+                        margin: 15px 0; 
+                        border-left: 4px solid {color_resultado};
+                        border-right: 1px solid #333;
+                        border-top: 1px solid #333;
+                        border-bottom: 1px solid #333;'>
+                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                    <div>
+                        <span style='color: #888; font-size: 12px;'>RECOMENDACIÓN</span>
+                        <h3 style='color: {color_resultado}; margin: 0; text-shadow: 0 0 5px {color_resultado};'>{icono} {recomendacion}</h3>
+                    </div>
+                    <div style='text-align: center;'>
+                        <span style='color: #888; font-size: 12px;'>VALOR ESPERADO (EV)</span>
+                        <h3 style='color: {"#00ff41" if ev >= 5 else "#ff6600"}; margin: 0;'>{ev}%</h3>
+                    </div>
+                    <div style='text-align: center;'>
+                        <span style='color: #888; font-size: 12px;'>CONFIANZA</span>
+                        <h3 style='color: #00ff41; margin: 0;'>{confianza}%</h3>
+                    </div>
+                    <div style='text-align: center;'>
+                        <span style='color: #888; font-size: 12px;'>TOTAL IA</span>
+                        <h3 style='color: #ff6600; margin: 0;'>{total_proyectado}</h3>
+                    </div>
+                </div>
+                <div style='margin-top: 10px;'>
+                    <span style='color: #888; font-size: 11px;'>{detalle}</span>
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # 🔥 CUOTAS COMPLETAS - ahora con todos los valores
-            col1, col2, col3 = st.columns(3)
+            # Barra de progreso de confianza
+            st.progress(confianza / 100)
             
-            with col1:
-                st.markdown("**💰 MONEYLINE**")
-                st.markdown(f"{local}: {odds.get('moneyline', {}).get('local', 'N/A')}")
-                st.markdown(f"{visitante}: {odds.get('moneyline', {}).get('visitante', 'N/A')}")
+            if etiqueta_verde or ev >= 8:
+                st.success("🔥 PICK DE ALTA CONFIANZA - Valor positivo detectado")
             
-            with col2:
-                st.markdown("**📊 SPREAD**")
-                st.markdown(f"{local}: {spread_local:+g}")
-                st.markdown(f"{visitante}: {spread_visit:+g}")
-                st.markdown(f"Odds: {spread_odds_local} / {spread_odds_visit}")
+            if analisis_gemini:
+                st.markdown("---")
+                st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                st.info(analisis_gemini)
             
-            with col3:
-                st.markdown("**🎯 OVER/UNDER**")
-                st.markdown(f"OVER {total_linea} ({over_odds})")
-                st.markdown(f"UNDER {total_linea} ({under_odds})")
-            
-            st.markdown("---")
-            
-            # Tres columnas de análisis
-            col_a1, col_a2, col_a3 = st.columns(3)
-            
-            # HEURÍSTICO
-            with col_a1:
-                st.markdown("<h4 style='color: #FFD700;'>📊 HEURÍSTICO</h4>", unsafe_allow_html=True)
-                if analisis_heurístico:
-                    color = self.colores.get(analisis_heurístico.get('color', 'gray'), '#9E9E9E')
-                    st.markdown(f"**{analisis_heurístico.get('apuesta', 'N/A')}**")
-                    st.markdown(f"Confianza: {analisis_heurístico.get('confianza', 0)}%")
+            if analisis_premium:
+                st.markdown("---")
+                st.markdown("### 🔬 PREMIUM ANALYTICS")
+                if isinstance(analisis_premium, dict):
+                    st.write(analisis_premium.get('analisis', 'Pendiente'))
                 else:
-                    st.markdown("Pendiente")
-            
-            # GEMINI IA
-            with col_a2:
-                st.markdown("<h4 style='color: #FFD700;'>🤖 GEMINI IA</h4>", unsafe_allow_html=True)
-                if analisis_gemini:
-                    color = self.colores.get(analisis_gemini.get('color', 'gray'), '#9E9E9E')
-                    apuesta = analisis_gemini.get('apuesta', analisis_gemini.get('ganador', 'N/A'))
-                    st.markdown(f"**{apuesta}**")
-                    st.markdown(f"Confianza: {analisis_gemini.get('confianza', 0)}%")
-                    razones = analisis_gemini.get('razones', [])
-                    if razones:
-                        for r in razones[:2]:
-                            st.markdown(f"• {r}")
-                else:
-                    st.markdown("Pendiente")
-            
-            # PREMIUM ANALYTICS
-            with col_a3:
-                st.markdown("<h4 style='color: #FFD700;'>🔬 PREMIUM ANALYTICS</h4>", unsafe_allow_html=True)
-                if analisis_premium:
-                    edge = analisis_premium.get('edge_rating', 0)
-                    public = analisis_premium.get('public_money', 0)
-                    sharps = analisis_premium.get('sharps_action', 'N/A')
-                    
-                    st.markdown(f"**Edge Rating:** {edge}")
-                    estrellas = "★" * int(edge) + "☆" * (10 - int(edge))
-                    st.markdown(f"{estrellas}")
-                    
-                    st.markdown(f"**Public Money:** {public}% {analisis_premium.get('public_team', '')}")
-                    st.markdown(f"**Sharps Action:** {sharps}")
-                    
-                    if analisis_premium.get('value_detected'):
-                        st.markdown("💰 **VALUE DETECTED**")
-                else:
-                    st.markdown("Pendiente")
-            
-            st.markdown("---")
-            
-            # Botones
-            col_b1, col_b2, col_b3, col_b4, col_b5 = st.columns(5)
-            
-            with col_b1:
-                if st.button(f"🔍 ANALIZAR", key=f"nba_analizar_{idx}"):
-                    return "analizar"
-            with col_b2:
-                if st.button(f"➕ HANDICAP", key=f"nba_h_{idx}"):
-                    if tracker:
-                        tracker.agregar_pick({
-                            'partido': f"{local} vs {visitante}",
-                            'pick': f"HANDICAP {local} {spread_local:+g}",
-                            'cuota': 1.91,
-                            'deporte': 'NBA'
-                        })
-                        st.success("✓ Agregado")
-            with col_b3:
-                if st.button(f"➕ OVER", key=f"nba_o_{idx}"):
-                    if tracker:
-                        tracker.agregar_pick({
-                            'partido': f"{local} vs {visitante}",
-                            'pick': f"OVER {total_linea}",
-                            'cuota': 1.91,
-                            'deporte': 'NBA'
-                        })
-                        st.success("✓ OVER")
-            with col_b4:
-                if st.button(f"➕ UNDER", key=f"nba_u_{idx}"):
-                    if tracker:
-                        tracker.agregar_pick({
-                            'partido': f"{local} vs {visitante}",
-                            'pick': f"UNDER {total_linea}",
-                            'cuota': 1.91,
-                            'deporte': 'NBA'
-                        })
-                        st.success("✓ UNDER")
-            with col_b5:
-                if st.button(f"➕ ML", key=f"nba_ml_{idx}"):
-                    if tracker:
-                        tracker.agregar_pick({
-                            'partido': f"{local} vs {visitante}",
-                            'pick': f"GANA {local}",
-                            'cuota': 1.91,
-                            'deporte': 'NBA'
-                        })
-                        st.success("✓ ML")
-            
-            st.markdown("---")
+                    st.write(str(analisis_premium))
+        
+        return None
+

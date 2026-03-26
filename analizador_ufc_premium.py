@@ -1,103 +1,57 @@
 ﻿"""
-ANALIZADOR UFC PREMIUM - Edge Rating, Public Money, Sharps Action
-Basado en investigación de Yale y modelos de ML [citation:3]
+ANALIZADOR UFC PREMIUM - Análisis avanzado de peleas UFC
 """
-import streamlit as st
-import random
-
 class AnalizadorUFCPremium:
-    """
-    Analizador premium que simula métricas de casas de apuestas profesionales
-    Basado en modelos de Sportradar [citation:5][citation:9]
-    """
-    
     def __init__(self):
-        print("✅ Analizador UFC Premium inicializado")
+        pass
     
-    def _calcular_edge_rating(self, prob_heurística, prob_mercado):
-        """
-        Calcula Edge Rating basado en diferencia entre probabilidad real y del mercado
-        """
-        if prob_mercado == 0:
-            return 5.0
-        
-        diff = prob_heurística - prob_mercado
-        # Normalizar a escala 0-10
-        edge = 5 + (diff / 10)
-        return max(0, min(10, edge))
+    def _extraer_numero(self, valor):
+        """Extrae número de un string como '178 cm'"""
+        if valor is None:
+            return 0
+        if isinstance(valor, (int, float)):
+            return valor
+        if isinstance(valor, str):
+            import re
+            nums = re.findall(r'\d+', valor)
+            return int(nums[0]) if nums else 0
+        return 0
     
-    def _estimar_prob_mercado(self, f1_data, f2_data):
-        """
-        Estima la probabilidad del mercado basado en rankings y récords
-        """
-        # Extraer rankings
-        rank1 = f1_data.get('ranking', 'No rankeado')
-        rank2 = f2_data.get('ranking', 'No rankeado')
+    def analizar(self, p1_data, p2_data, resultado_heur):
+        """Analiza pelea UFC con criterios premium"""
         
-        # Convertir a números
-        try:
-            r1 = int(rank1.split()[0].replace('#', '')) if rank1 != 'No rankeado' else 15
-            r2 = int(rank2.split()[0].replace('#', '')) if rank2 != 'No rankeado' else 15
-        except:
-            r1 = 8
-            r2 = 8
+        p1_nombre = p1_data.get('nombre', 'Peleador 1') if p1_data else 'Peleador 1'
+        p2_nombre = p2_data.get('nombre', 'Peleador 2') if p2_data else 'Peleador 2'
         
-        # Diferencia de rankings
-        diff_rank = r2 - r1  # positivo si f1 está mejor rankeado
+        # Obtener datos del análisis heurístico
+        ganador = resultado_heur.get('ganador', p1_nombre)
+        probabilidad = resultado_heur.get('confianza', 55)
+        metodo = resultado_heur.get('metodo', 'Decisión')
+        etiqueta_verde = resultado_heur.get('etiqueta_verde', False)
         
-        # Probabilidad base del mercado
-        prob_base = 50 + diff_rank * 3
-        return max(30, min(70, prob_base))
-    
-    def _calcular_public_money(self, f1_data, f2_data):
-        """
-        Calcula distribución del dinero público
-        """
-        # Factores que influyen en el público
-        f1_reconocido = 1 if f1_data.get('ranking', '') != 'No rankeado' else 0
-        f2_reconocido = 1 if f2_data.get('ranking', '') != 'No rankeado' else 0
+        # Datos adicionales de peleadores - convertir a números
+        alcance1 = self._extraer_numero(p1_data.get('alcance', '0')) if p1_data else 0
+        alcance2 = self._extraer_numero(p2_data.get('alcance', '0')) if p2_data else 0
+        ko1 = p1_data.get('ko_rate', 0.5) if p1_data else 0.5
+        ko2 = p2_data.get('ko_rate', 0.5) if p2_data else 0.5
         
-        base = 50
-        if f1_reconocido > f2_reconocido:
-            base += 10
-        elif f2_reconocido > f1_reconocido:
-            base -= 10
+        # Análisis premium: ajustar confianza
+        diff_alcance = alcance1 - alcance2
+        if abs(diff_alcance) > 5:
+            if (diff_alcance > 0 and ganador == p1_nombre) or (diff_alcance < 0 and ganador == p2_nombre):
+                probabilidad = min(95, probabilidad + 10)
+                etiqueta_verde = probabilidad >= 75
         
-        return max(30, min(70, base))
-    
-    def _calcular_sharps_action(self, edge_rating, public_money):
-        """
-        Determina dónde va el dinero inteligente (sharps)
-        """
-        if edge_rating > 7:
-            return "Sharps heavily on underdog" if public_money < 50 else "Sharps fading the public"
-        elif edge_rating < 3:
-            return "Sharps on favorite" if public_money > 50 else "Sharps split"
-        else:
-            return "Sharps split action"
-    
-    def analizar(self, f1_data, f2_data, resultado_heurístico):
-        """
-        Genera análisis premium
-        """
-        f1_nombre = f1_data.get('nombre', '')
-        f2_nombre = f2_data.get('nombre', '')
-        
-        prob_heurística = resultado_heurístico.get('confianza', 50)
-        prob_mercado = self._estimar_prob_mercado(f1_data, f2_data)
-        
-        edge = self._calcular_edge_rating(prob_heurística, prob_mercado)
-        public = self._calcular_public_money(f1_data, f2_data)
-        sharps = self._calcular_sharps_action(edge, public)
+        # Análisis de KO
+        if metodo == "KO/TKO" and max(ko1, ko2) > 0.6:
+            probabilidad = min(95, probabilidad + 5)
         
         return {
-            'edge_rating': round(edge, 1),
-            'public_money': public,
-            'public_team': f1_nombre if public > 50 else f2_nombre,
-            'sharps_action': sharps,
-            'prob_mercado': round(prob_mercado, 1),
-            'prob_modelo': round(prob_heurística, 1),
-            'value_detected': abs(prob_heurística - prob_mercado) > 5,
-            'recomendacion': resultado_heurístico.get('apuesta', 'N/A'),
-            'confianza': resultado_heurístico.get('confianza', 0)
+            'ganador': ganador,
+            'probabilidad': probabilidad,
+            'metodo': metodo,
+            'etiqueta_verde': etiqueta_verde,
+            'analisis': f"Ventaja de {'alcance' if abs(diff_alcance) > 5 else 'KO'} detectada",
+            'confianza': probabilidad,
+            'diff_alcance': diff_alcance
         }

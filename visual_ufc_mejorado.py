@@ -1,197 +1,151 @@
-﻿"""
-VISUAL UFC MEJORADO - Letra reducida para datos físicos
+﻿# -*- coding: utf-8 -*-
 """
+VISUAL UFC MEJORADO - Con estilo NEON y Gemini decisor final
+"""
+
 import streamlit as st
+import sqlite3
 
 class VisualUFCMejorado:
     def __init__(self):
-        self.colores = {
-            'local': '#FF6B35',
-            'visitante': '#0066CC',
-            'green': '#4CAF50',
-            'orange': '#FF9800',
-            'blue': '#2196F3',
-            'red': '#f44336',
-            'gold': '#FFD700',
-            'yellow': '#FFC107'
-        }
+        self.db_path = 'data/betting_stats.db'
     
-    def render(self, combate, idx, tracker=None, 
-               datos_peleador1=None, datos_peleador2=None,
+    def obtener_datos_peleador(self, nombre):
+        """Obtiene datos REALES del peleador desde SQLite"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            c = conn.cursor()
+            c.execute("""
+                SELECT nombre, record, altura, peso, alcance, postura, ko_rate, grappling
+                FROM peleadores_ufc 
+                WHERE nombre LIKE ? OR nombre = ?
+                LIMIT 1
+            """, (f"%{nombre}%", nombre))
+            row = c.fetchone()
+            conn.close()
+            
+            if row:
+                return {
+                    'nombre': row[0],
+                    'record': row[1] if row[1] else '0-0-0',
+                    'altura': row[2] if row[2] else 'N/A',
+                    'peso': row[3] if row[3] else 'N/A',
+                    'alcance': row[4] if row[4] else 'N/A',
+                    'postura': row[5] if row[5] else 'Desconocida',
+                    'ko_rate': row[6] if row[6] else 0.5,
+                    'grappling': row[7] if row[7] else 0.5
+                }
+            return None
+        except Exception as e:
+            return None
+    
+    def render(self, partido, idx, tracker, datos_peleador1=None, datos_peleador2=None, 
                analisis_heurístico=None, analisis_gemini=None, analisis_premium=None):
+        """Renderiza una tarjeta de combate UFC con estilo NEON"""
         
-        with st.container():
-            if idx > 0:
-                st.markdown("---")
+        p1_nombre = partido.get('peleador1', {}).get('nombre', '')
+        p2_nombre = partido.get('peleador2', {}).get('nombre', '')
+        
+        # Intentar obtener datos reales de la DB si no vienen
+        if not datos_peleador1 and p1_nombre:
+            datos_peleador1 = self.obtener_datos_peleador(p1_nombre)
+        if not datos_peleador2 and p2_nombre:
+            datos_peleador2 = self.obtener_datos_peleador(p2_nombre)
+        
+        # Tarjeta NEON
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #0f0f1a 0%, #1a1f2a 100%); 
+                    border-radius: 15px; 
+                    padding: 20px; 
+                    margin: 15px 0; 
+                    border: 1px solid #00ff41;
+                    box-shadow: 0 0 15px rgba(0, 255, 65, 0.2);'>
+            <div style='display: flex; justify-content: space-between; align-items: center;'>
+                <div style='text-align: center; flex: 1;'>
+                    <h2 style='color: #fff; text-shadow: 0 0 5px #ff6600; margin: 0;'>{p1_nombre}</h2>
+                </div>
+                <div style='text-align: center; flex: 0.5;'>
+                    <h1 style='color: #00ff41; text-shadow: 0 0 10px #00ff41; margin: 0;'>VS</h1>
+                </div>
+                <div style='text-align: center; flex: 1;'>
+                    <h2 style='color: #fff; text-shadow: 0 0 5px #ff6600; margin: 0;'>{p2_nombre}</h2>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Datos de peleadores
+        if datos_peleador1 and datos_peleador2:
+            col1, col2 = st.columns(2)
             
-            evento = combate.get('evento', 'UFC Event')
-            fecha = combate.get('fecha', 'Próximamente')
+            with col1:
+                st.markdown(f"**🔴 {p1_nombre}**")
+                st.caption(f"📊 Record: {datos_peleador1.get('record', 'N/A')}")
+                st.caption(f"📏 Altura: {datos_peleador1.get('altura', 'N/A')}")
+                st.caption(f"📏 Alcance: {datos_peleador1.get('alcance', 'N/A')}")
+                st.caption(f"💥 KO Rate: {int(datos_peleador1.get('ko_rate', 0) * 100)}%")
+                st.caption(f"🤼 Grappling: {int(datos_peleador1.get('grappling', 0) * 100)}%")
             
-            if datos_peleador1 and datos_peleador2:
-                p1 = datos_peleador1
-                p2 = datos_peleador2
-            else:
-                p1 = combate.get('peleador1', {})
-                p2 = combate.get('peleador2', {})
-                p1['altura'] = p1.get('altura', 'N/A')
-                p1['peso'] = p1.get('peso', 'N/A')
-                p1['alcance'] = p1.get('alcance', 'N/A')
-                p1['postura'] = p1.get('postura', 'Desconocida')
-                p2['altura'] = p2.get('altura', 'N/A')
-                p2['peso'] = p2.get('peso', 'N/A')
-                p2['alcance'] = p2.get('alcance', 'N/A')
-                p2['postura'] = p2.get('postura', 'Desconocida')
+            with col2:
+                st.markdown(f"**🔵 {p2_nombre}**")
+                st.caption(f"📊 Record: {datos_peleador2.get('record', 'N/A')}")
+                st.caption(f"📏 Altura: {datos_peleador2.get('altura', 'N/A')}")
+                st.caption(f"📏 Alcance: {datos_peleador2.get('alcance', 'N/A')}")
+                st.caption(f"💥 KO Rate: {int(datos_peleador2.get('ko_rate', 0) * 100)}%")
+                st.caption(f"🤼 Grappling: {int(datos_peleador2.get('grappling', 0) * 100)}%")
+        
+        # Boton ANALIZAR
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🔥 ANALIZAR UFC", key=f"ufc_analizar_{idx}", use_container_width=True):
+                return "analizar"
+        
+        # Mostrar analisis si existe
+        if analisis_heurístico:
+            st.markdown("---")
             
-            # Encabezado
+            recomendacion = analisis_heurístico.get('recomendacion', 'N/A')
+            confianza = analisis_heurístico.get('confianza', 0)
+            metodo = analisis_heurístico.get('metodo', 'Decision')
+            factor_clave = analisis_heurístico.get('factor_clave', '')
+            etiqueta_verde = analisis_heurístico.get('etiqueta_verde', False)
+            
+            color_resultado = "#00ff41" if "GANA" in recomendacion else "#ff6600"
+            icono = "🏆" if "GANA" in recomendacion else "🥊"
+            
             st.markdown(f"""
-            <div style="background-color: #1E1E1E; padding: 20px; border-radius: 10px; border-left: 5px solid #FFD700;">
-                <span style="color: #FFD700; font-weight: bold; font-size: 24px;">🥊 {evento}</span>
-                <span style="color: #888; float: right;">📅 {fecha}</span>
+            <div style='background: linear-gradient(135deg, #1a1f2a 0%, #0f1419 100%); 
+                        border-radius: 12px; 
+                        padding: 20px; 
+                        margin: 15px 0; 
+                        border-left: 4px solid {color_resultado};'>
+                <div style='display: flex; justify-content: space-between; align-items: center;'>
+                    <div>
+                        <span style='color: #888; font-size: 12px;'>RECOMENDACION</span>
+                        <h3 style='color: {color_resultado}; margin: 0;'>{icono} {recomendacion}</h3>
+                        <p style='color: #888; font-size: 11px; margin: 5px 0 0;'>{factor_clave}</p>
+                    </div>
+                    <div style='text-align: center;'>
+                        <span style='color: #888; font-size: 12px;'>CONFIANZA</span>
+                        <h3 style='color: #00ff41; margin: 0;'>{confianza}%</h3>
+                    </div>
+                    <div style='text-align: center;'>
+                        <span style='color: #888; font-size: 12px;'>METODO</span>
+                        <h3 style='color: #ff6600; margin: 0;'>{metodo}</h3>
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
-            # Peleadores con datos físicos
-            col1, col2, col3 = st.columns([2, 1, 2])
+            st.progress(confianza / 100)
             
-            with col1:
-                st.markdown(f"## 🔴 {p1.get('nombre', 'Desconocido')}")
-                st.markdown(f"📊 **Récord:** {p1.get('record', '0-0-0')}")
-                
-                # 🔥 DATOS FÍSICOS CON LETRA MÁS PEQUEÑA
-                st.markdown(f"<p style='font-size: 14px; color: #888;'>📏 Altura: {p1.get('altura', 'N/A')} | ⚖️ Peso: {p1.get('peso', 'N/A')} | 📏 Alcance: {p1.get('alcance', 'N/A')} | 🥊 Postura: {p1.get('postura', 'Desconocida')}</p>", unsafe_allow_html=True)
-                
-                # Estadísticas de carrera
-                stats1 = p1.get('estadisticas_carrera', {})
-                if stats1:
-                    with st.expander("📊 Estadísticas de carrera", expanded=False):
-                        col_s1, col_s2 = st.columns(2)
-                        with col_s1:
-                            st.metric("Golpes/min", stats1.get('sig_strikes_landed_per_min', 0))
-                            st.metric("Precisión", f"{stats1.get('sig_strike_accuracy', 0)}%")
-                        with col_s2:
-                            st.metric("Derribos/15min", stats1.get('td_avg_per_15min', 0))
-                            st.metric("Defensa Derribos", f"{stats1.get('td_defense', 0)}%")
-            
-            with col2:
-                st.markdown("<h1 style='text-align: center; color: #666;'>VS</h1>", unsafe_allow_html=True)
-            
-            with col3:
-                st.markdown(f"## 🔵 {p2.get('nombre', 'Desconocido')}")
-                st.markdown(f"📊 **Récord:** {p2.get('record', '0-0-0')}")
-                
-                # 🔥 DATOS FÍSICOS CON LETRA MÁS PEQUEÑA
-                st.markdown(f"<p style='font-size: 14px; color: #888;'>📏 Altura: {p2.get('altura', 'N/A')} | ⚖️ Peso: {p2.get('peso', 'N/A')} | 📏 Alcance: {p2.get('alcance', 'N/A')} | 🥊 Postura: {p2.get('postura', 'Desconocida')}</p>", unsafe_allow_html=True)
-                
-                stats2 = p2.get('estadisticas_carrera', {})
-                if stats2:
-                    with st.expander("📊 Estadísticas de carrera", expanded=False):
-                        col_s1, col_s2 = st.columns(2)
-                        with col_s1:
-                            st.metric("Golpes/min", stats2.get('sig_strikes_landed_per_min', 0))
-                            st.metric("Precisión", f"{stats2.get('sig_strike_accuracy', 0)}%")
-                        with col_s2:
-                            st.metric("Derribos/15min", stats2.get('td_avg_per_15min', 0))
-                            st.metric("Defensa Derribos", f"{stats2.get('td_defense', 0)}%")
-            
+            if etiqueta_verde:
+                st.success("🔥 PICK DE ALTA CONFIANZA - Valor positivo detectado")
+        
+        # Gemini IA
+        if analisis_gemini:
             st.markdown("---")
-            
-            # Análisis
-            col_a1, col_a2, col_a3 = st.columns(3)
-            
-            # HEURÍSTICO
-            with col_a1:
-                st.markdown("<h4 style='color: #FFD700;'>📊 HEURÍSTICO</h4>", unsafe_allow_html=True)
-                if analisis_heurístico:
-                    color = self.colores.get(analisis_heurístico.get('color', 'gray'), '#9E9E9E')
-                    st.markdown(f"**{analisis_heurístico.get('apuesta', 'N/A')}**")
-                    st.markdown(f"Confianza: {analisis_heurístico.get('confianza', 0)}%")
-                    st.markdown(f"Método: {analisis_heurístico.get('metodo', 'N/A')}")
-                    
-                    stats_detalle = analisis_heurístico.get('stats_detalle', {})
-                    if stats_detalle:
-                        with st.expander("📈 Detalles del análisis", expanded=False):
-                            st.json(stats_detalle)
-                else:
-                    st.markdown("Pendiente")
-            
-            # PREMIUM ANALYTICS
-            with col_a2:
-                st.markdown("<h4 style='color: #FFD700;'>🔬 PREMIUM ANALYTICS</h4>", unsafe_allow_html=True)
-                if analisis_premium:
-                    edge = analisis_premium.get('edge_rating', 0)
-                    public = analisis_premium.get('public_money', 0)
-                    sharps = analisis_premium.get('sharps_action', 'N/A')
-                    
-                    st.markdown(f"**Edge Rating:** {edge}")
-                    estrellas = "★" * int(edge) + "☆" * (10 - int(edge))
-                    st.markdown(f"{estrellas}")
-                    
-                    st.markdown(f"**Public Money:** {public}% {analisis_premium.get('public_team', '')}")
-                    st.markdown(f"**Sharps Action:** {sharps}")
-                    
-                    if analisis_premium.get('value_detected'):
-                        st.markdown("💰 **VALUE DETECTED**")
-                else:
-                    st.markdown("Pendiente")
-            
-            # GEMINI IA
-            with col_a3:
-                st.markdown("<h4 style='color: #FFD700;'>🤖 GEMINI IA</h4>", unsafe_allow_html=True)
-                if analisis_gemini:
-                    st.markdown(f"**Ganador:** {analisis_gemini.get('ganador', 'N/A')}")
-                    st.markdown(f"Probabilidad: {analisis_gemini.get('prob_f1', 0)}% / {analisis_gemini.get('prob_f2', 0)}%")
-                    st.markdown(f"**Método:** {analisis_gemini.get('metodo', 'N/A')}")
-                    
-                    factores = analisis_gemini.get('factores_clave', [])
-                    if factores:
-                        st.markdown("**Factores clave:**")
-                        for f in factores[:2]:
-                            st.markdown(f"• {f}")
-                else:
-                    st.markdown("Pendiente")
-            
-            st.markdown("---")
-            
-            # Historial de peleas
-            col_h1, col_h2 = st.columns(2)
-            
-            with col_h1:
-                if p1.get('historial'):
-                    with st.expander(f"📅 Últimas peleas de {p1.get('nombre', '')}", expanded=False):
-                        for pelea in p1['historial'][:3]:
-                            st.markdown(f"• {pelea.get('fecha', '')}: {pelea.get('resultado', '')} vs {pelea.get('oponente', '')} ({pelea.get('metodo', '')})")
-            
-            with col_h2:
-                if p2.get('historial'):
-                    with st.expander(f"📅 Últimas peleas de {p2.get('nombre', '')}", expanded=False):
-                        for pelea in p2['historial'][:3]:
-                            st.markdown(f"• {pelea.get('fecha', '')}: {pelea.get('resultado', '')} vs {pelea.get('oponente', '')} ({pelea.get('metodo', '')})")
-            
-            # Botones
-            col_b1, col_b2, col_b3 = st.columns(3)
-            
-            with col_b1:
-                if st.button(f"🔍 ANALIZAR", key=f"analizar_ufc_{idx}"):
-                    return "analizar"
-            
-            with col_b2:
-                if st.button(f"➕ AGREGAR AL PARLAY", key=f"add_ufc_{idx}"):
-                    if tracker:
-                        tracker.agregar_pick({
-                            'partido': f"{p1.get('nombre', '')} vs {p2.get('nombre', '')}",
-                            'evento': evento,
-                            'pick': f"Gana {p1.get('nombre', 'P1')}",
-                            'cuota': 2.0,
-                            'deporte': 'UFC'
-                        })
-                        st.success("✓ Agregado")
-            
-            with col_b3:
-                if st.button(f"📊 DETALLES", key=f"details_ufc_{idx}"):
-                    with st.expander("Detalles completos del dataset"):
-                        st.json({
-                            'peleador1': p1,
-                            'peleador2': p2
-                        })
-            
-            st.markdown("---")
+            st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+            st.info(analisis_gemini)
+        
+        return None
