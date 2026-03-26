@@ -1,8 +1,7 @@
 ﻿# -*- coding: utf-8 -*-
 """
-MAIN VISION COMPLETO - VERSION FUSIONADA
-NBA, UFC, Futbol y MLB con scrapers complementarios
-No se elimina nada, solo se mejora la obtencion de datos
+MAIN VISION COMPLETO - Versión para Streamlit Cloud
+Ejecuta scrapers automáticamente al iniciar
 """
 
 import streamlit as st
@@ -11,18 +10,19 @@ import pandas as pd
 import os
 import logging
 import sqlite3
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ==================== IMPORTS ORIGINALES ====================
+# ==================== IMPORTS ====================
 from espn_nba import ESPN_NBA
 from espn_mlb import ESPN_MLB_Mejorado as ESPN_MLB
 from espn_ufc import ESPN_UFC
 from espn_futbol import ESPN_FUTBOL
 from bet_tracker import BetTracker
 from visual_nba_mejorado import VisualNBAMejorado
-from visual_ufc_mejorado import VisualUFCMejorado
+from visual_ufc_final import VisualUFCFinal
 from visual_futbol_triple import VisualFutbolTriple
 from visual_mlb import VisualMLB
 from analizador_nba_mejorado import AnalizadorNBAMejorado
@@ -34,7 +34,7 @@ from analizador_futbol_heurístico_mejorado import AnalizadorFutbolHeuristicoMej
 from analizador_futbol_gemini_mejorado import AnalizadorFutbolGeminiMejorado
 from analizador_futbol_premium import AnalizadorFutbolPremium
 from ufc_data_aggregator import UFCDataAggregator
-from analizador_ufc_heurístico import AnalizadorUFCHuristico
+from analizador_ufc_final import AnalizadorUFCFinal
 from analizador_ufc_gemini import AnalizadorUFCGemini
 from analizador_ufc_premium import AnalizadorUFCPremium
 from analizador_ufc_ko_pro import AnalizadorUFCKOPro
@@ -48,28 +48,45 @@ from analizador_mlb_pro import AnalizadorMLBPro
 from database_manager import db
 from render_unificado import render_analisis_card
 from motor_mlb_pro import MotorMLBPro
-
-# Motor V17
 from integrador_v17 import get_integrador
 
-# ==================== SCRAPERS COMPLEMENTARIOS ====================
-try:
-    from scraper_mlb_dinamico import ScraperMLBDinamico
-    SCRAPER_MLB_COVERS = True
-except ImportError:
-    SCRAPER_MLB_COVERS = False
+# ==================== FUNCIONES DE ACTUALIZACIÓN ====================
+def actualizar_odds_ufc():
+    """Ejecuta scraper de odds UFC"""
+    try:
+        from scraper_odds_ufc_definitivo import actualizar_odds_ufc as scraper_odds
+        st.info("🔄 Actualizando odds de UFC...")
+        odds = scraper_odds()
+        return odds
+    except Exception as e:
+        st.warning(f"⚠️ No se pudieron actualizar odds UFC: {e}")
+        return {}
 
-try:
-    from scraper_futbol_dinamico import ScraperFutbolDinamico
-    SCRAPER_FUTBOL_SOCCERWAY = True
-except ImportError:
-    SCRAPER_FUTBOL_SOCCERWAY = False
+def actualizar_datos_ufc():
+    """Ejecuta scraper de datos de peleadores UFC"""
+    try:
+        from scraper_ufc_final import actualizar_ufc as scraper_ufc
+        st.info("🔄 Actualizando datos de peleadores UFC...")
+        scraper_ufc()
+        return True
+    except Exception as e:
+        st.warning(f"⚠️ No se pudieron actualizar datos UFC: {e}")
+        return False
 
-try:
-    from scraper_ufc_dinamico import ScraperUFCDinamico
-    SCRAPER_UFC_COVERS = True
-except ImportError:
-    SCRAPER_UFC_COVERS = False
+# ==================== INICIALIZACIÓN CON SCRAPERS ====================
+def inicializar_datos():
+    """Inicializa datos ejecutando scrapers"""
+    st.info("🚀 Inicializando BETTING AI NEON...")
+    
+    # Crear carpetas necesarias
+    os.makedirs("data", exist_ok=True)
+    
+    # Ejecutar scrapers en segundo plano
+    with st.spinner("🔄 Actualizando datos de peleadores UFC..."):
+        actualizar_datos_ufc()
+    
+    with st.spinner("🔄 Actualizando odds de UFC..."):
+        actualizar_odds_ufc()
 
 # ============================================
 # FUNCIONES AUXILIARES
@@ -88,7 +105,7 @@ def obtener_peleador_detalle(nombre):
         conn = sqlite3.connect('data/betting_stats.db')
         c = conn.cursor()
         c.execute("""
-            SELECT nombre, record, altura, peso, alcance, postura, ko_rate, grappling
+            SELECT nombre, record, altura, peso, alcance, postura, ko_rate, grappling, odds
             FROM peleadores_ufc 
             WHERE nombre LIKE ? OR nombre = ?
             LIMIT 1
@@ -104,27 +121,15 @@ def obtener_peleador_detalle(nombre):
                 'alcance': row[4] if row[4] else 'N/A',
                 'postura': row[5] if row[5] else 'Desconocida',
                 'ko_rate': row[6] if row[6] else 0.5,
-                'grappling': row[7] if row[7] else 0.5
+                'grappling': row[7] if row[7] else 0.5,
+                'odds': row[8] if row[8] else 'N/A'
             }
         return None
     except:
         return None
 
-def fusionar_odds_mlb(partidos_espn, partidos_covers):
-    if not partidos_covers:
-        return partidos_espn
-    for p in partidos_espn:
-        for oc in partidos_covers:
-            if p['local'].lower() in oc['local'].lower() and p['visitante'].lower() in oc['visitante'].lower():
-                if oc['odds'].get('moneyline', {}).get('local', 'N/A') != 'N/A':
-                    p['odds']['moneyline'] = oc['odds']['moneyline']
-                if oc['odds'].get('over_under', 8.5) != 8.5:
-                    p['odds']['over_under'] = oc['odds']['over_under']
-                break
-    return partidos_espn
-
 # ============================================
-# CONFIGURACION DE PAGINA
+# CONFIGURACIÓN DE PÁGINA
 # ============================================
 st.set_page_config(page_title="BETTING AI - NEON EDITION", page_icon="🎯", layout="wide")
 
@@ -170,15 +175,18 @@ GEMINI_DISPONIBLE = bool(GEMINI_API_KEY)
 if GEMINI_DISPONIBLE:
     st.success("✅ Gemini conectado - Decisor Final activo")
 else:
-    st.warning("⚠️ Gemini no disponible - Solo analisis matematico")
+    st.warning("⚠️ Gemini no disponible - Solo análisis matemático")
 
 LIGAS_FUTBOL = ESPNLeagueCodes.obtener_todas()
 
 # ============================================
-# INICIALIZACION
+# INICIALIZACIÓN
 # ============================================
 def main():
     if 'init' not in st.session_state:
+        # Ejecutar scrapers al iniciar
+        inicializar_datos()
+        
         st.session_state.scrapers = {
             'nba': ESPN_NBA(),
             'mlb': ESPN_MLB(),
@@ -187,7 +195,7 @@ def main():
         }
         st.session_state.tracker = BetTracker()
         st.session_state.visual_nba = VisualNBAMejorado()
-        st.session_state.visual_ufc = VisualUFCMejorado()
+        st.session_state.visual_ufc = VisualUFCFinal()
         st.session_state.visual_futbol = VisualFutbolTriple()
         st.session_state.visual_mlb = VisualMLB()
         st.session_state.integrador_v17 = get_integrador()
@@ -231,6 +239,12 @@ def main():
         st.header("⚙️ CONTROLES")
         st.session_state.tracker.render_sidebar_tracker()
         st.markdown("---")
+        
+        # Botón para actualizar manualmente
+        if st.button("🔄 ACTUALIZAR ODDS UFC", use_container_width=True):
+            with st.spinner("Actualizando odds..."):
+                actualizar_odds_ufc()
+                st.success("✅ Odds actualizados")
 
         if st.button("🏀 CARGAR NBA", use_container_width=True):
             with st.spinner("Cargando NBA..."):
@@ -243,12 +257,6 @@ def main():
         if st.button("⚾ CARGAR MLB", use_container_width=True):
             with st.spinner("Cargando MLB..."):
                 partidos = st.session_state.scrapers['mlb'].get_games()
-                if SCRAPER_MLB_COVERS and partidos:
-                    try:
-                        odds_covers = ScraperMLBDinamico().get_games()
-                        partidos = fusionar_odds_mlb(partidos, odds_covers)
-                    except Exception as e:
-                        logger.warning(f"Error complementando MLB: {e}")
                 st.session_state.mlb_partidos = partidos
                 if st.session_state.mlb_partidos:
                     st.success(f"✅ {len(st.session_state.mlb_partidos)} partidos")
@@ -258,17 +266,6 @@ def main():
         if st.button("🥊 CARGAR UFC", use_container_width=True):
             with st.spinner("Cargando UFC..."):
                 combates = st.session_state.scrapers['ufc'].get_events()
-                if SCRAPER_UFC_COVERS and combates:
-                    try:
-                        odds_ufc = ScraperUFCDinamico().get_events()
-                        for c in combates:
-                            for ou in odds_ufc:
-                                if c['peleador1']['nombre'].lower() in ou['peleador1']['nombre'].lower() and \
-                                   c['peleador2']['nombre'].lower() in ou['peleador2']['nombre'].lower():
-                                    c['odds'] = ou.get('odds', {})
-                                    break
-                    except Exception as e:
-                        logger.warning(f"Error complementando UFC: {e}")
                 st.session_state.ufc_combates = combates
                 if st.session_state.ufc_combates:
                     st.success(f"✅ {len(st.session_state.ufc_combates)} combates")
@@ -276,7 +273,7 @@ def main():
                     st.warning("⚠️ No hay eventos UFC disponibles")
 
         st.markdown("---")
-        st.subheader("⚽ FUTBOL")
+        st.subheader("⚽ FÚTBOL")
         buscar_liga = st.text_input("🔍 Buscar liga:", placeholder="Ej: Premier, LaLiga, Liga MX...")
         ligas_filtradas = [l for l in LIGAS_FUTBOL if buscar_liga.lower() in l.lower()] if buscar_liga else LIGAS_FUTBOL
         
@@ -288,7 +285,7 @@ def main():
                         st.session_state.futbol_partidos[liga] = partidos
                         st.success(f"✅ {len(partidos)} partidos")
 
-        if st.button("🧹 LIMPIAR CACHE", use_container_width=True):
+        if st.button("🧹 LIMPIAR CACHÉ", use_container_width=True):
             st.session_state.futbol_partidos = {}
             st.rerun()
 
@@ -296,7 +293,8 @@ def main():
             st.session_state.clear()
             st.rerun()
 
-    tab1, tab2, tab3, tab4 = st.tabs(["🏀 NBA", "🥊 UFC", "⚽ FUTBOL", "⚾ MLB"])
+    # ==================== TABS ====================
+    tab1, tab2, tab3, tab4 = st.tabs(["🏀 NBA", "🥊 UFC", "⚽ FÚTBOL", "⚾ MLB"])
 
     # ==================== TAB NBA ====================
     with tab1:
@@ -334,7 +332,7 @@ def main():
                             if st.session_state.analizador_gemini:
                                 decision_gemini = st.session_state.analizador_gemini.analizar_con_decision(p, resultado)
                                 st.session_state.nba_analisis_gemini[key] = decision_gemini
-                            st.success("✅ Analisis completado")
+                            st.success("✅ Análisis completado")
                         else:
                             st.warning(prediccion.get('msg', 'No se pudo analizar'))
                     st.rerun()
@@ -349,36 +347,117 @@ def main():
                 key = f"ufc_{idx}"
                 p1_nombre = c.get('peleador1', {}).get('nombre', '')
                 p2_nombre = c.get('peleador2', {}).get('nombre', '')
-                datos_p1 = obtener_peleador_detalle(p1_nombre) if p1_nombre else None
-                datos_p2 = obtener_peleador_detalle(p2_nombre) if p2_nombre else None
+                
                 analisis_heur = st.session_state.ufc_analisis_heur.get(key)
                 analisis_gemini = st.session_state.ufc_analisis_gemini.get(key)
                 
                 accion = st.session_state.visual_ufc.render(
                     c, idx, st.session_state.tracker,
-                    datos_peleador1=datos_p1,
-                    datos_peleador2=datos_p2,
-                    analisis_heurístico=analisis_heur,
-                    analisis_gemini=analisis_gemini,
-                    analisis_premium=None
+                    analisis=analisis_heur
                 )
                 
-                if accion == "analizar" and datos_p1 and datos_p2:
-                    with st.spinner("🥊 Analizando UFC..."):
-                        analizador = AnalizadorUFCHuristico(datos_p1, datos_p2)
+                if accion == "analizar":
+                    with st.spinner("🥊 Analizando UFC con odds reales..."):
+                        analizador = AnalizadorUFCFinal(p1_nombre, p2_nombre)
                         resultado = analizador.analizar()
                         st.session_state.ufc_analisis_heur[key] = resultado
+                        
                         if st.session_state.analizador_ufc_gemini:
-                            resumen = analizador.obtener_resumen() if hasattr(analizador, 'obtener_resumen') else {}
-                            resultado_gemini = st.session_state.analizador_ufc_gemini.analizar(datos_p1, datos_p2, resumen)
-                            st.session_state.ufc_analisis_gemini[key] = resultado_gemini
-                        st.success("✅ Analisis completado")
+                            decision_gemini = st.session_state.analizador_ufc_gemini.analizar(
+                                resultado.get('stats_p1', {}),
+                                resultado.get('stats_p2', {}),
+                                resultado.get('factor_clave', '')
+                            )
+                            st.session_state.ufc_analisis_gemini[key] = decision_gemini
+                        elif st.session_state.analizador_gemini:
+                            decision_gemini = st.session_state.analizador_gemini.orquestrar_decision_final(
+                                deporte="ufc",
+                                partido=c,
+                                analisis_heuristico=resultado
+                            )
+                            st.session_state.ufc_analisis_gemini[key] = decision_gemini
+                        
+                        st.success("✅ Análisis completado")
                         st.rerun()
+                
+                if analisis_heur:
+                    stats1 = analisis_heur.get('stats_p1', {})
+                    stats2 = analisis_heur.get('stats_p2', {})
+                    
+                    st.markdown("---")
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"**🔴 {p1_nombre}**")
+                        st.caption(f"📊 Record: {stats1.get('record', 'N/A')}")
+                        st.caption(f"📏 Altura: {stats1.get('altura_cm', 0)} cm")
+                        st.caption(f"📏 Alcance: {stats1.get('alcance_cm', 0)} cm")
+                        st.caption(f"💥 KO Rate: {stats1.get('ko_rate', 0)}%")
+                        st.caption(f"🎲 Odds: {analisis_heur.get('odds_p1', 'N/A')}")
+                        if analisis_heur.get('ev_p1', 0) > 0:
+                            st.caption(f"📈 EV: +{analisis_heur.get('ev_p1', 0)}%")
+                    
+                    with col2:
+                        st.markdown(f"**🔵 {p2_nombre}**")
+                        st.caption(f"📊 Record: {stats2.get('record', 'N/A')}")
+                        st.caption(f"📏 Altura: {stats2.get('altura_cm', 0)} cm")
+                        st.caption(f"📏 Alcance: {stats2.get('alcance_cm', 0)} cm")
+                        st.caption(f"💥 KO Rate: {stats2.get('ko_rate', 0)}%")
+                        st.caption(f"🎲 Odds: {analisis_heur.get('odds_p2', 'N/A')}")
+                        if analisis_heur.get('ev_p2', 0) > 0:
+                            st.caption(f"📈 EV: +{analisis_heur.get('ev_p2', 0)}%")
+                    
+                    st.markdown("---")
+                    
+                    recomendacion = analisis_heur.get('recomendacion', 'N/A')
+                    confianza = analisis_heur.get('confianza', 0)
+                    metodo = analisis_heur.get('metodo', 'Decision')
+                    factor_clave = analisis_heur.get('factor_clave', '')
+                    factor_adicional = analisis_heur.get('factor_adicional', '')
+                    etiqueta_verde = analisis_heur.get('etiqueta_verde', False)
+                    
+                    color = "#00ff41" if "GANA" in recomendacion else "#ff6600"
+                    icono = "🏆" if "GANA" in recomendacion else "🥊"
+                    
+                    st.markdown(f"""
+                    <div style='background: linear-gradient(135deg, #1a1f2a 0%, #0f1419 100%); 
+                                border-radius: 12px; 
+                                padding: 20px; 
+                                margin: 15px 0; 
+                                border-left: 4px solid {color};'>
+                        <div style='display: flex; justify-content: space-between; align-items: center;'>
+                            <div>
+                                <span style='color: #888; font-size: 12px;'>RECOMENDACION</span>
+                                <h3 style='color: {color}; margin: 0;'>{icono} {recomendacion}</h3>
+                                <p style='color: #888; font-size: 11px; margin: 5px 0 0;'>{factor_clave}</p>
+                                <p style='color: #ff6600; font-size: 10px; margin: 3px 0 0;'>{factor_adicional}</p>
+                            </div>
+                            <div style='text-align: center;'>
+                                <span style='color: #888; font-size: 12px;'>CONFIANZA</span>
+                                <h3 style='color: #00ff41; margin: 0;'>{confianza}%</h3>
+                            </div>
+                            <div style='text-align: center;'>
+                                <span style='color: #888; font-size: 12px;'>METODO</span>
+                                <h3 style='color: #ff6600; margin: 0;'>{metodo}</h3>
+                            </div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.progress(confianza / 100)
+                    
+                    if etiqueta_verde:
+                        st.success("🔥 PICK DE ALTA CONFIANZA - Valor positivo detectado")
+                
+                if analisis_gemini:
+                    st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                    st.info(analisis_gemini)
+                
                 st.markdown("---")
         else:
             st.info("👈 Carga UFC en el sidebar")
 
-    # ==================== TAB FUTBOL ====================
+    # ==================== TAB FÚTBOL ====================
     with tab3:
         if st.session_state.futbol_partidos:
             for liga, partidos in st.session_state.futbol_partidos.items():
@@ -398,7 +477,7 @@ def main():
                         )
                         
                         if accion == "analizar":
-                            with st.spinner("⚽ Analizando Futbol..."):
+                            with st.spinner("⚽ Analizando Fútbol..."):
                                 stats_l = {'form_goles': [1, 2, 1, 1, 2], 'victorias': 2}
                                 stats_v = {'form_goles': [1, 1, 1, 2, 1], 'victorias': 2}
                                 analizador = AnalizadorFutbolHeuristicoMejorado(stats_l, stats_v, p['local'], p['visitante'])
@@ -408,7 +487,7 @@ def main():
                                 if st.session_state.analizador_futbol_gemini_mejorado:
                                     resultado_gemini = st.session_state.analizador_futbol_gemini_mejorado.analizar(p, stats_l, stats_v, {})
                                     st.session_state.futbol_analisis_gemini[key] = resultado_gemini
-                                st.success("✅ Analisis completado")
+                                st.success("✅ Análisis completado")
                                 st.rerun()
                         st.markdown("---")
         else:
@@ -430,7 +509,7 @@ def main():
                 )
                 
                 if accion == "analizar":
-                    with st.spinner("⚾ Analizando MLB con Motor + Gemini..."):
+                    with st.spinner("⚾ Analizando MLB..."):
                         res = st.session_state.analizador_mlb.analizar_partido(p)
                         st.session_state.mlb_analisis[key] = res
                         
@@ -478,7 +557,7 @@ def main():
                             </div>
                         </div>
                         <div style='margin-top: 10px;'>
-                            <span style='color: #888; font-size: 11px;'>Proyeccion: {proyeccion_local:.1f} - {proyeccion_visitante:.1f} carreras</span>
+                            <span style='color: #888; font-size: 11px;'>Proyección: {proyeccion_local:.1f} - {proyeccion_visitante:.1f} carreras</span>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
