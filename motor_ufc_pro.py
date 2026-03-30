@@ -1,10 +1,10 @@
 import numpy as np
 from database_manager import db
 
-def analizar_ufc_pro(peleadores_data, historial_db=None):  # mantengo nombre exacto
+def analizar_ufc_pro(peleadores_data, historial_db=None):
     if historial_db is None:
         historial_db = db.get_ufc_stats()
-    a, b = peleadores_data['a'], peleadores_data['b']
+    a, b = peleadores_data.get('a', ''), peleadores_data.get('b', '')
     a_stats = historial_db.get(a, {})
     b_stats = historial_db.get(b, {})
     
@@ -21,9 +21,11 @@ def analizar_ufc_pro(peleadores_data, historial_db=None):  # mantengo nombre exa
     if prob_ko > 0.40: recs.append(f"✅ {a} por KO")
     
     return {
-        "deporte": "UFC", "pelea": f"{a} vs {b}",
+        "deporte": "UFC", 
+        "pelea": f"{a} vs {b}",
         "prob_a": round(prob_a_win*100, 1),
-        "recomendaciones": recs or ["Espera"], "edge": abs(prob_a_win - 0.5)*100
+        "recomendaciones": recs or ["Espera"], 
+        "edge": abs(prob_a_win - 0.5)*100
     }
 
 def backtest_ufc_pro(df_hist=None, n=150):
