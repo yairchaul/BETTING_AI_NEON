@@ -1,29 +1,26 @@
-# motor_ufc_pro.py
+# motor_ufc_pro_v2.py
 def analizar_ufc_pro(peleadores_data, historial_db):
-    fighter_a = peleadores_data['a']
-    fighter_b = peleadores_data['b']
+    a, b = peleadores_data['a'], peleadores_data['b']
+    a_stats = historial_db[a]
+    b_stats = historial_db[b]
     
-    # Stats reales de tu DB peleadores_ufc
-    a_strike_def = historial_db[fighter_a]['strike_defense']
-    b_takedown_acc = historial_db[fighter_b]['td_accuracy']
-    # ... reach_diff, sig_strikes_per_min, etc.
+    strike_def_a = a_stats['strike_def']
+    td_acc_b = b_stats['td_acc']
+    reach_diff = a_stats.get('reach', 0) - b_stats.get('reach', 0)
     
-    # Simulación 10k peleas
-    sims = 10000
-    a_wins = 0
-    ko_prob = 0
-    for _ in range(sims):
-        # lógica de rounds basada en stats
-        if np.random.rand() < (a_strike_def - b_takedown_acc + reach_diff * 0.01):
-            a_wins += 1
-            if np.random.rand() < 0.42:  # KO probability ajustada por stats
-                ko_prob += 1
-    
+    sims = 12000
+    a_wins = sum(1 for _ in range(sims) if np.random.rand() < (0.55 + (strike_def_a - td_acc_b + reach_diff*0.008)))
     prob_a_win = a_wins / sims
-    prob_ko = ko_prob / sims  # pero no es el único factor
+    prob_ko = prob_a_win * 0.48  # ajustado por stats
+    
+    recs = []
+    if prob_a_win > 0.62: recs.append(f"✅ {a} GANADOR")
+    if prob_ko > 0.40: recs.append(f"✅ {a} por KO")
     
     return {
-        "prob_a": round(prob_a_win * 100, 1),
-        "prob_ko": round(prob_ko * 100, 1),
-        "edge": "KO A" if prob_ko > 38 and prob_a_win > 62 else "DECISION" if ... else None
+        "deporte": "UFC",
+        "pelea": f"{a} vs {b}",
+        "prob_a": round(prob_a_win*100, 1),
+        "recomendaciones": recs or ["Espera"],
+        "edge": abs(prob_a_win - 0.5)*100
     }
