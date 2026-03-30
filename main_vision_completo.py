@@ -77,10 +77,10 @@ def main():
         
         # NUEVO: motores v20
         st.session_state.motores_v20 = {
-            'nba': analizar_nba_pro_v20,
-            'mlb': analizar_mlb_pro_v20,
-            'ufc': analizar_ufc_pro_v20,
-            'futbol': analizar_futbol_pro_v20
+            'nba': analizar_nba_pro_v17,
+            'mlb': analizar_mlb_pro,
+            'ufc': analizar_ufc_pro,
+            'futbol': analizar_fut_pro
         }
         
         st.session_state.init = True
