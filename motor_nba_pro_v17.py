@@ -1,44 +1,71 @@
-# motor_nba_pro_v18.py
+# motor_nba_pro_v19.py
 import pandas as pd
 import numpy as np
 from scipy.stats import poisson, norm
 
 def analizar_nba_pro(partido_data, historial_db):
-    # partido_data viene de tu espn_nba.py + odds de scraper
-    home = partido_data['home']
-    away = partido_data['away']
+    home, away = partido_data['home'], partido_data['away']
+    odds = partido_data['odds']
     
-    # Features reales (tú ya las scrapeas)
+    # Team level (como antes pero más preciso)
     home_off = historial_db[home]['off_rating'].mean()
     home_def = historial_db[home]['def_rating'].mean()
     away_off = historial_db[away]['off_rating'].mean()
     away_def = historial_db[away]['def_rating'].mean()
     pace = (historial_db[home]['pace'].mean() + historial_db[away]['pace'].mean()) / 2
-    rest_home = partido_data.get('rest_home', 1)  # 1 = rested
-    rest_away = partido_data.get('rest_away', 1)
+    rest_h = partido_data.get('rest_home', 1)
+    rest_a = partido_data.get('rest_away', 1)
     
-    # Expected points
-    exp_home = (home_off * away_def / 100) * pace / 100 * (1 + 0.03 * rest_home)
-    exp_away = (away_off * home_def / 100) * pace / 100 * (1 + 0.03 * rest_away)
+    exp_home = (home_off * away_def / 100) * pace / 100 * (1 + 0.035 * rest_h)
+    exp_away = (away_off * home_def / 100) * pace / 100 * (1 + 0.035 * rest_a)
     exp_total = exp_home + exp_away
-    exp_spread = exp_home - exp_away + 3.2  # home advantage real
+    exp_spread = exp_home - exp_away + 3.2
     
-    # Monte Carlo 15k iteraciones (más rápido y preciso que tus 10k)
-    sims = 15000
+    sims = 20000
     home_scores = poisson.rvs(exp_home, size=sims)
     away_scores = poisson.rvs(exp_away, size=sims)
-    home_wins = (home_scores > away_scores).mean()
+    prob_home_win = (home_scores > away_scores).mean()
     avg_spread = (home_scores - away_scores).mean()
     avg_total = (home_scores + away_scores).mean()
     
-    # Value vs tus 6 opciones de casas
-    odds = partido_data['odds']  # dict con ml_home, spread_home, total, etc.
-    value_ml = home_wins - (1 / (odds['ml_home'] / 100 + 1)) if odds['ml_home'] < 0 else ...
-    # (calcula los 5 value más como en mi ejemplo anterior)
+    # === NUEVA 3ª OPCIÓN: PLAYER PROPS ===
+    props_recom = []
+    if 'player_props' in partido_data:  # viene de tu player_props.py + scraper
+        for player, prop_line in partido_data['player_props'].items():
+            # Stats históricas del jugador (tú ya las tienes en DB)
+            p_stats = historial_db.get(player, {})
+            avg_pts = p_stats.get('pts_per_game', 0)
+            avg_3pm = p_stats.get('three_pm', 0)
+            matchup_factor = 1.0  # puedes ajustar por defensa rival
+            
+            # Poisson simple pero efectivo para props
+            prob_over_pts = 1 - poisson.cdf(prop_line['pts_line'], avg_pts * matchup_factor)
+            prob_over_3pm = 1 - poisson.cdf(prop_line['three_line'], avg_3pm * matchup_factor)
+            
+            if prob_over_pts > 0.58 and prop_line.get('pts_odds'):
+                props_recom.append(f"✅ {player} OVER {prop_line['pts_line']} PTS")
+            if prob_over_3pm > 0.57 and prop_line.get('three_odds'):
+                props_recom.append(f"✅ {player} OVER {prop_line['three_line']} 3PM")
+    
+    # Value calculation (edge >5%)
+    value_ml = (prob_home_win - (1 / (odds.get('ml_home', -110)/100 + 1))) * 100
+    value_spread = avg_spread - odds.get('spread_home', 0)
+    value_total = avg_total - odds.get('total', 0)
+    
+    recs = []
+    if value_ml > 5: recs.append("✅ ML HOME")
+    if value_spread > 1.8: recs.append("✅ SPREAD HOME")
+    if value_spread < -1.8: recs.append("✅ SPREAD AWAY")
+    if value_total > 4: recs.append("✅ OVER")
+    if value_total < -4: recs.append("✅ UNDER")
+    recs.extend(props_recom[:3])  # las 3 mejores props
     
     return {
-        "prob_home": round(home_wins * 100, 1),
+        "deporte": "NBA",
+        "partido": f"{home} vs {away}",
+        "prob_home": round(prob_home_win*100, 1),
         "exp_spread": round(avg_spread, 1),
         "exp_total": round(avg_total, 1),
-        "recomendaciones": [op for op in ["ML HOME", "SPREAD HOME", "OVER"] if value > 4.5]
+        "recomendaciones": recs or ["Espera mejor edge"],
+        "edge": max(value_ml, abs(value_spread), abs(value_total))
     }
