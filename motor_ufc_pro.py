@@ -1,8 +1,9 @@
 import numpy as np
 from database_manager import db
 
-def analizar_ufc_pro_v20(peleadores_data, historial_db=None):
-    if historial_db is None: historial_db = db.get_ufc_stats()
+def analizar_ufc_pro(peleadores_data, historial_db=None):  # mantengo nombre exacto
+    if historial_db is None:
+        historial_db = db.get_ufc_stats()
     a, b = peleadores_data['a'], peleadores_data['b']
     a_stats = historial_db.get(a, {})
     b_stats = historial_db.get(b, {})
@@ -25,5 +26,5 @@ def analizar_ufc_pro_v20(peleadores_data, historial_db=None):
         "recomendaciones": recs or ["Espera"], "edge": abs(prob_a_win - 0.5)*100
     }
 
-def backtest_ufc_v20(df_hist=None, n=150):
+def backtest_ufc_pro(df_hist=None, n=150):
     return {"roi": -9.7, "bets": 110, "hit_rate": 47.3}
