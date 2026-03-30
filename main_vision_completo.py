@@ -50,10 +50,10 @@ from motor_mlb_pro import MotorMLBPro
 from integrador_v17 import get_integrador
 
 # ==================== NUEVOS MOTORES v20 ====================
-from motor_nba_pro_v20 import analizar_nba_pro_v20, backtest_nba_v20
-from motor_mlb_pro_v20 import analizar_mlb_pro_v20, backtest_mlb_v20
-from motor_ufc_pro_v20 import analizar_ufc_pro_v20, backtest_ufc_v20
-from motor_futbol_pro_v20 import analizar_futbol_pro_v20, backtest_futbol_v20
+from motor_nba_pro_v17 import analizar_nba_pro_v20, backtest_nba_v20
+from motor_mlb_pro import analizar_mlb_pro_v20, backtest_mlb_v20
+from motor_ufc_pro import analizar_ufc_pro_v20, backtest_ufc_v20
+from motor_fut_pro import analizar_futbol_pro_v20, backtest_futbol_v20
 
 # ==================== RESTO DEL CÓDIGO ORIGINAL (sin cambios) ====================
 # ... (todo lo que tenías hasta st.set_page_config se queda IGUAL)
