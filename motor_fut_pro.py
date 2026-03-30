@@ -34,5 +34,4 @@ def analizar_futbol_pro_v20(partido_data, historial_db=None):
     }
 
 def backtest_futbol_v20(df_hist=None, n=300):
-    # Simulación simple (reemplaza con tus datos reales cuando tengas)
-    return {"roi": 36.7, "bets": 165, "hit_rate": 51.8}
+    return {"roi": -8.1, "bets": 210, "hit_rate": 48.1}
