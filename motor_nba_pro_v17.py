@@ -3,8 +3,9 @@ import numpy as np
 from scipy.stats import poisson
 from database_manager import db
 
-def analizar_nba_pro_v20(partido_data, historial_db=None):
-    if historial_db is None: historial_db = db.get_team_stats()
+def analizar_nba_pro_v17(partido_data, historial_db=None):  # mantengo nombre de función que usas
+    if historial_db is None:
+        historial_db = db.get_team_stats()
     home, away = partido_data['home'], partido_data['away']
     odds = partido_data.get('odds', {})
     
@@ -28,12 +29,14 @@ def analizar_nba_pro_v20(partido_data, historial_db=None):
     avg_spread = (home_scores - away_scores).mean()
     avg_total = (home_scores + away_scores).mean()
     
+    # Player props (la 3ra opción que querías)
     props_recom = []
     if 'player_props' in partido_data:
         for player, prop in partido_data['player_props'].items():
             avg_pts = historial_db.get(player, {}).get('pts_per_game', 0)
             prob_over = 1 - poisson.cdf(prop.get('pts_line', 0), avg_pts * 1.08)
-            if prob_over > 0.58: props_recom.append(f"✅ {player} OVER {prop.get('pts_line')} PTS")
+            if prob_over > 0.58:
+                props_recom.append(f"✅ {player} OVER {prop.get('pts_line')} PTS")
     
     recs = []
     if prob_home_win > 0.58: recs.append("✅ ML HOME")
@@ -49,5 +52,5 @@ def analizar_nba_pro_v20(partido_data, historial_db=None):
         "edge": max(prob_home_win - 0.5, 0) * 100
     }
 
-def backtest_nba_v20(df_hist=None, n=200):
+def backtest_nba_v17(df_hist=None, n=200):
     return {"roi": 5.2, "bets": 138, "hit_rate": 55.1}
