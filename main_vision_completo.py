@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MAIN VISION COMPLETO - NEON V20 (mejorado con motores v20 + backtest)
+MAIN VISION COMPLETO - NEON V20 (Motores v20 integrados sin romper nada)
 """
 
 import streamlit as st
@@ -9,12 +9,11 @@ import pandas as pd
 import os
 import logging
 import sqlite3
-import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ==================== IMPORTS ORIGINALES (sin tocar) ====================
+# ==================== IMPORTS ORIGINALES ====================
 from espn_nba import ESPN_NBA
 from espn_mlb import ESPN_MLB_Mejorado as ESPN_MLB
 from espn_ufc import ESPN_UFC
@@ -43,80 +42,97 @@ from visual_nba_props import VisualNBAProps
 from gestor_ligas_universal import GestorLigasUniversal
 from espn_league_codes import ESPNLeagueCodes
 from analizador_ufc_maestro import AnalizadorUFCMaestro
-from analizador_mlb_pro import AnalizadorMLBPro
 from database_manager import db
 from render_unificado import render_analisis_card
-from motor_mlb_pro import MotorMLBPro
 from integrador_v17 import get_integrador
 
-# ==================== NUEVOS MOTORES v20 ====================
-from motor_nba_pro_v17 import analizar_nba_pro_v20, backtest_nba_v20
-from motor_mlb_pro import analizar_mlb_pro_v20, backtest_mlb_v20
-from motor_ufc_pro import analizar_ufc_pro_v20, backtest_ufc_v20
-from motor_fut_pro import analizar_futbol_pro_v20, backtest_futbol_v20
+# ==================== MOTORES v20 (usando nombres exactos de tu repo) ====================
+from motor_nba_pro_v17 import analizar_nba_pro_v17, backtest_nba_v17
+from motor_mlb_pro import analizar_mlb_pro, backtest_mlb_pro
+from motor_ufc_pro import analizar_ufc_pro, backtest_ufc_pro
+from motor_futbol_pro_v20 import analizar_futbol_pro_v20, backtest_futbol_pro_v20
 
-# ==================== RESTO DEL CÓDIGO ORIGINAL (sin cambios) ====================
-# ... (todo lo que tenías hasta st.set_page_config se queda IGUAL)
+# ==================== FUNCIONES AUXILIARES ====================
+def actualizar_odds_ufc():
+    try:
+        from scraper_odds_ufc_definitivo import actualizar_odds_ufc as scraper_odds
+        st.info("🔄 Actualizando odds de UFC...")
+        odds = scraper_odds()
+        return odds
+    except Exception as e:
+        st.warning(f"⚠️ No se pudieron actualizar odds UFC: {e}")
+        return {}
 
+def actualizar_datos_ufc():
+    try:
+        from scraper_ufc_final import actualizar_ufc as scraper_ufc
+        st.info("🔄 Actualizando datos de peleadores UFC...")
+        scraper_ufc()
+        return True
+    except Exception as e:
+        st.warning(f"⚠️ No se pudieron actualizar datos UFC: {e}")
+        return False
+
+def inicializar_datos():
+    st.info("🚀 Inicializando BETTING AI NEON...")
+    os.makedirs("data", exist_ok=True)
+    with st.spinner("🔄 Actualizando datos de peleadores UFC..."):
+        actualizar_datos_ufc()
+    with st.spinner("🔄 Actualizando odds de UFC..."):
+        actualizar_odds_ufc()
+
+def get_gemini_api_key():
+    try:
+        with open('.env', 'r') as f:
+            for linea in f:
+                if 'GEMINI_API_KEY' in linea:
+                    return linea.split('=')[1].strip().strip('"').strip("'")
+    except:
+        return ""
+
+# ==================== CONFIGURACIÓN ====================
 st.set_page_config(page_title="BETTING AI - NEON EDITION", page_icon="🎯", layout="wide")
 
-st.markdown("""<style> ... todo tu CSS neon se queda idéntico ... </style>""", unsafe_allow_html=True)
+st.markdown("""
+<style>
+    .stMarkdown, .stText, .stCaption, .stSubheader, div, p, span, label { text-shadow: 0 0 2px #ff6600, 0 0 3px #ff6600; }
+    h1, h2, h3, h4 { color: #fff; text-shadow: 0 0 5px #fff, 0 0 10px #ff6600, 0 0 20px #00ff41, 0 0 30px #00ff41; text-align: center; }
+    .stButton>button { border: 2px solid #00ff41 !important; background-color: transparent !important; color: #00ff41 !important; text-shadow: 0 0 2px #ff6600; box-shadow: 0 0 10px #00ff41; transition: 0.3s; }
+    .stButton>button:hover { background-color: #00ff41 !important; color: #000 !important; box-shadow: 0 0 25px #ff6600; }
+    .profit-card { background: #1a1f2a; padding: 15px; border-radius: 10px; border: 1px solid #00ff41; text-align: center; }
+</style>
+""", unsafe_allow_html=True)
 
 st.title("🎯 BETTING AI - NEON EDITION")
 st.markdown(f"### 📅 {datetime.now().strftime('%d/%m/%Y')} - Motores v20 probados")
 
-# ... (get_gemini_api_key, obtener_peleador_detalle, LIGAS_FUTBOL, todo igual)
+GEMINI_API_KEY = get_gemini_api_key()
+LIGAS_FUTBOL = ESPNLeagueCodes.obtener_todas()
 
+# ==================== INICIALIZACIÓN ====================
 def main():
     if 'init' not in st.session_state:
         inicializar_datos()
         
-        st.session_state.scrapers = { ... }  # igual
+        st.session_state.scrapers = {
+            'nba': ESPN_NBA(),
+            'mlb': ESPN_MLB(),
+            'ufc': ESPN_UFC(),
+            'futbol': ESPN_FUTBOL()
+        }
         st.session_state.tracker = BetTracker()
-        # ... todos tus session_state originales
+        st.session_state.visual_nba = VisualNBAMejorado()
+        st.session_state.visual_ufc = VisualUFCFinal()
+        st.session_state.visual_futbol = VisualFutbolTriple()
+        st.session_state.visual_mlb = VisualMLB()
+        st.session_state.integrador_v17 = get_integrador()
         
-        # NUEVO: motores v20
+        # ==================== MOTORES v20 ====================
         st.session_state.motores_v20 = {
             'nba': analizar_nba_pro_v17,
             'mlb': analizar_mlb_pro,
             'ufc': analizar_ufc_pro,
-            'futbol': analizar_fut_pro
+            'futbol': analizar_futbol_pro_v20
         }
         
-        st.session_state.init = True
-
-    with st.sidebar:
-        # ... tus botones originales
-        st.markdown("---")
-        st.subheader("🔥 MOTORES v20")
-        if st.button("📊 Backtest TODOS", use_container_width=True):
-            st.success("NBA: +5.2% | MLB: +5.1% | UFC: -9.7% | FÚTBOL: -8.1%")
-
-    # TABS (igual)
-    tab1, tab2, tab3, tab4 = st.tabs(["🏀 NBA", "🥊 UFC", "⚽ FÚTBOL", "⚾ MLB"])
-
-    # TAB NBA (ejemplo de integración sin romper)
-    with tab1:
-        if st.session_state.nba_partidos:
-            for idx, p in enumerate(st.session_state.nba_partidos):
-                # ... tu código visual original
-                accion = st.session_state.visual_nba.render(...)  # igual
-                
-                if accion == "analizar":
-                    with st.spinner("🏀 Analizando con Motor v20..."):
-                        resultado_v20 = st.session_state.motores_v20['nba'](p, db.get_team_stats())
-                        render_analisis_card(resultado_v20)  # muestra el nuevo motor
-                        if st.button("Ejecutar Backtest NBA v20", key=f"bt_nba_{idx}"):
-                            bt = backtest_nba_v20()
-                            st.success(f"ROI: {bt['roi']}% | Bets: {bt['bets']} | Hit: {bt['hit_rate']}%")
-                    st.rerun()
-                st.markdown("---")
-        else:
-            st.info("👈 Carga NBA en el sidebar")
-
-    # Repite el mismo patrón en TAB UFC, TAB FÚTBOL y TAB MLB (usa st.session_state.motores_v20['ufc'], etc. y sus backtest)
-
-    # Profit card y if __name__ == "__main__": se quedan idénticos
-
-if __name__ == "__main__":
-    main()
+        # Mant
