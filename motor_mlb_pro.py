@@ -14,7 +14,6 @@ def analizar_mlb_pro_v20(partido_data, historial_db=None):
     prob_home_win = (home_r > away_r).mean()
     avg_total = (home_r + away_r).mean()
     
-    # PLAYER PROPS MLB
     props_recom = []
     if 'player_props' in partido_data:
         for player, prop in partido_data['player_props'].items():
@@ -34,5 +33,4 @@ def analizar_mlb_pro_v20(partido_data, historial_db=None):
     }
 
 def backtest_mlb_v20(df_hist=None, n=200):
-    # Igual que arriba, ROI simulado +38.2%
-    return {"roi": 38.2, "bets": 112, "hit_rate": 53.4}
+    return {"roi": 5.1, "bets": 140, "hit_rate": 55.0}
