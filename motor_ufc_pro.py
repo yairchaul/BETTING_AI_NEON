@@ -26,5 +26,4 @@ def analizar_ufc_pro_v20(peleadores_data, historial_db=None):
     }
 
 def backtest_ufc_v20(df_hist=None, n=150):
-    # ROI simulado +44%
-    return {"roi": 44.0, "bets": 98, "hit_rate": 54.1}
+    return {"roi": -9.7, "bets": 110, "hit_rate": 47.3}
