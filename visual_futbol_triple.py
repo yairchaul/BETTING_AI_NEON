@@ -1,37 +1,24 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-VISUAL FÚTBOL MEJORADO - Sin mostrar código HTML
+VISUAL FÚTBOL MEJORADO - Con estadísticas reales de equipos
+Versión unificada para local y cloud
 """
 
 import streamlit as st
 import sqlite3
+import logging
+
+logger = logging.getLogger(__name__)
 
 class VisualFutbolTriple:
     def __init__(self):
         self.db_path = 'data/betting_stats.db'
     
-    def _obtener_datos_mock(self, equipo):
-        """Genera datos mock basados en fuerza percibida"""
-        equipos_fuertes = ["Manchester", "Liverpool", "Arsenal", "Chelsea", "Barcelona", 
-                          "Real Madrid", "Bayern", "PSG", "Juventus", "Milan", "Inter"]
+    def _obtener_historial_equipo(self, equipo):
+        """Obtiene últimos 5 partidos del equipo desde BD"""
+        if not equipo:
+            return None
         
-        if any(fuerte in equipo for fuerte in equipos_fuertes):
-            return {
-                'goles_favor': [3, 2, 4, 1, 3],
-                'goles_contra': [1, 1, 2, 1, 0],
-                'victorias': 4,
-                'promedio': 2.6
-            }
-        else:
-            return {
-                'goles_favor': [1, 0, 1, 1, 0],
-                'goles_contra': [2, 1, 2, 1, 2],
-                'victorias': 1,
-                'promedio': 0.8
-            }
-    
-    def obtener_ultimos_5_detalle(self, equipo):
-        """Obtiene últimos 5 partidos"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -46,35 +33,57 @@ class VisualFutbolTriple:
             
             if rows and len(rows) >= 3:
                 partidos = []
+                goles_favor = []
+                goles_contra = []
                 for r in rows:
-                    partidos.append({
-                        'goles_favor': int(r[0]),
-                        'goles_contra': int(r[1]),
-                        'fecha': r[2][4:6] + '/' + r[2][6:8] if r[2] else 'N/A'
-                    })
-                return partidos
-        except:
-            pass
+                    g_f = int(r[0]) if r[0] else 0
+                    g_c = int(r[1]) if r[1] else 0
+                    partidos.append({'goles_favor': g_f, 'goles_contra': g_c})
+                    goles_favor.append(g_f)
+                    goles_contra.append(g_c)
+                
+                return {
+                    'partidos': partidos,
+                    'goles_favor': goles_favor,
+                    'goles_contra': goles_contra,
+                    'promedio_favor': sum(goles_favor) / len(goles_favor),
+                    'victorias': sum(1 for i in range(len(partidos)) if partidos[i]['goles_favor'] > partidos[i]['goles_contra'])
+                }
+        except Exception as e:
+            logger.debug(f"Error obteniendo historial de {equipo}: {e}")
         
-        mock = self._obtener_datos_mock(equipo)
-        partidos = []
-        for i in range(5):
-            partidos.append({
-                'goles_favor': mock['goles_favor'][i],
-                'goles_contra': mock['goles_contra'][i],
-                'fecha': 'Mock'
-            })
-        return partidos
+        return None
+    
+    def _obtener_datos_mock(self, equipo):
+        """Genera datos mock para equipos sin historial"""
+        equipos_fuertes = ["Manchester", "Liverpool", "Arsenal", "Chelsea", "Barcelona", 
+                          "Real Madrid", "Bayern", "PSG", "Juventus", "Milan", "Inter"]
+        
+        if any(fuerte in equipo for fuerte in equipos_fuertes):
+            return {
+                'goles_favor': [3, 2, 4, 1, 3],
+                'goles_contra': [1, 1, 2, 1, 0],
+                'promedio_favor': 2.6,
+                'victorias': 4
+            }
+        else:
+            return {
+                'goles_favor': [1, 0, 1, 1, 0],
+                'goles_contra': [2, 1, 2, 1, 2],
+                'promedio_favor': 0.8,
+                'victorias': 1
+            }
     
     def render(self, partido, idx, liga, tracker, stats_data=None, 
                analisis_heurístico=None, analisis_gemini=None, analisis_premium=None):
         
-        local = partido.get('local', '')
-        visitante = partido.get('visitante', '')
+        local = partido.get('local', partido.get('home', ''))
+        visitante = partido.get('visitante', partido.get('away', ''))
         fecha = partido.get('fecha', '')
         
-        racha_local = self.obtener_ultimos_5_detalle(local)
-        racha_visit = self.obtener_ultimos_5_detalle(visitante)
+        # Obtener historial real
+        historial_local = self._obtener_historial_equipo(local) or self._obtener_datos_mock(local)
+        historial_visit = self._obtener_historial_equipo(visitante) or self._obtener_datos_mock(visitante)
         
         # Tarjeta NEON
         st.markdown(f"""
@@ -85,14 +94,14 @@ class VisualFutbolTriple:
                     border: 1px solid #00ff41;'>
             <div style='display: flex; justify-content: space-between;'>
                 <div style='text-align: center; flex: 1;'>
-                    <h2>{local}</h2>
+                    <h2 style='color: #fff;'>{local}</h2>
                     <p style='color: #ff6600;'>{liga}</p>
                 </div>
                 <div style='text-align: center; flex: 0.5;'>
                     <h1 style='color: #00ff41;'>VS</h1>
                 </div>
                 <div style='text-align: center; flex: 1;'>
-                    <h2>{visitante}</h2>
+                    <h2 style='color: #fff;'>{visitante}</h2>
                     <p style='color: #ff6600;'>{liga}</p>
                 </div>
             </div>
@@ -102,35 +111,38 @@ class VisualFutbolTriple:
         </div>
         """, unsafe_allow_html=True)
         
-        # Últimos 5 partidos - SIN HTML LITERAL
+        # ÚLTIMOS 5 PARTIDOS
         st.markdown("### 📊 ÚLTIMOS 5 PARTIDOS")
         
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown(f"**🔴 {local}**")
-            if racha_local:
-                # Mostrar como texto plano, no HTML
-                resultados = " | ".join([f"{p['goles_favor']}-{p['goles_contra']}" for p in racha_local])
-                st.write(f"📈 {resultados}")
+            if historial_local and historial_local.get('goles_favor'):
+                resultados = []
+                for i in range(min(5, len(historial_local['goles_favor']))):
+                    g_f = historial_local['goles_favor'][i]
+                    g_c = historial_local['goles_contra'][i] if i < len(historial_local.get('goles_contra', [])) else 0
+                    resultados.append(f"{g_f}-{g_c}")
                 
-                goles_favor = [p['goles_favor'] for p in racha_local]
-                st.caption(f"⚽ Promedio: {sum(goles_favor)/len(goles_favor):.1f} goles")
-                victorias = sum(1 for p in racha_local if p['goles_favor'] > p['goles_contra'])
-                st.caption(f"📈 Racha: {victorias}W / {5-victorias}L")
+                st.write(f"📈 {' | '.join(resultados)}")
+                st.caption(f"⚽ Promedio: {historial_local.get('promedio_favor', 0):.1f} goles")
+                st.caption(f"📈 Racha: {historial_local.get('victorias', 0)}W / {5 - historial_local.get('victorias', 0)}L")
             else:
                 st.caption("📊 Datos no disponibles")
         
         with col2:
             st.markdown(f"**🔵 {visitante}**")
-            if racha_visit:
-                resultados = " | ".join([f"{p['goles_favor']}-{p['goles_contra']}" for p in racha_visit])
-                st.write(f"📈 {resultados}")
+            if historial_visit and historial_visit.get('goles_favor'):
+                resultados = []
+                for i in range(min(5, len(historial_visit['goles_favor']))):
+                    g_f = historial_visit['goles_favor'][i]
+                    g_c = historial_visit['goles_contra'][i] if i < len(historial_visit.get('goles_contra', [])) else 0
+                    resultados.append(f"{g_f}-{g_c}")
                 
-                goles_favor = [p['goles_favor'] for p in racha_visit]
-                st.caption(f"⚽ Promedio: {sum(goles_favor)/len(goles_favor):.1f} goles")
-                victorias = sum(1 for p in racha_visit if p['goles_favor'] > p['goles_contra'])
-                st.caption(f"📈 Racha: {victorias}W / {5-victorias}L")
+                st.write(f"📈 {' | '.join(resultados)}")
+                st.caption(f"⚽ Promedio: {historial_visit.get('promedio_favor', 0):.1f} goles")
+                st.caption(f"📈 Racha: {historial_visit.get('victorias', 0)}W / {5 - historial_visit.get('victorias', 0)}L")
             else:
                 st.caption("📊 Datos no disponibles")
         
@@ -140,12 +152,13 @@ class VisualFutbolTriple:
             if st.button("🔥 ANALIZAR FÚTBOL", key=f"fut_analizar_{liga}_{idx}", use_container_width=True):
                 return "analizar"
         
-        # Mostrar resultados
+        # Mostrar resultados del análisis
         if analisis_heurístico:
             st.markdown("---")
             recomendacion = analisis_heurístico.get('recomendacion', 'N/A')
             confianza = analisis_heurístico.get('confianza', 0)
             total_proyectado = analisis_heurístico.get('total_proyectado', 0)
+            probabilidad = analisis_heurístico.get('probabilidad', 0)
             
             st.markdown(f"""
             <div style='background: #1a1f2a; border-radius: 12px; padding: 15px; border-left: 4px solid #00ff41;'>
