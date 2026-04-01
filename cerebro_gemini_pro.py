@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-CEREBRO GEMINI PRO - Decisor Final Inteligente (Versión Recomendada)
+CEREBRO GEMINI PRO - Decisor Final Inteligente (Versión Optimizada)
 """
 
 import os
@@ -38,6 +38,7 @@ class CerebroGeminiPro:
             self.model = None
 
     def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis: Dict) -> str:
+        """Decisor final inteligente con análisis de valor real"""
         if not self.model:
             return "❌ Gemini no disponible - usando solo análisis matemático"
 
@@ -56,21 +57,23 @@ class CerebroGeminiPro:
         prob = analisis.get('probabilidad', confianza)
 
         prompt = f"""
-Eres un analista experto en apuestas deportivas. Sé honesto y conservador.
+Eres un analista profesional de apuestas deportivas con más de 15 años de experiencia. Eres conservador y solo recomiendas cuando hay **valor real**.
 
-Deporte: {deporte.upper()}
-Partido: {local} vs {visitante}
+**Deporte:** {deporte.upper()}
+**Partido:** {local} vs {visitante}
 
-Análisis del Motor v20:
+**Análisis del Motor v20:**
 - Recomendación: {recomendacion}
 - Confianza matemática: {confianza}%
 - Probabilidad: {prob}%
 - Total proyectado: {total}
 - Edge: {edge:.1f}%
 
-Decide la mejor apuesta final considerando tanto los números como factores cualitativos.
-
-Responde **SOLO** con este formato exacto:
+**Instrucciones:**
+- Evalúa si el análisis matemático tiene sentido.
+- Considera factores cualitativos importantes según el deporte (fatiga, lesiones, motivación, historial H2H, condiciones específicas).
+- Sé honesto: si no hay valor claro, di "NO RECOMENDAR".
+- Responde **solo** con el formato exacto.
 
 MEJOR APUESTA FINAL: [OVER/UNDER/ML/SPREAD/BTTS/GANA LOCAL/GANA VISITANTE/NO RECOMENDAR]
 PROBABILIDAD ESTIMADA: XX%
@@ -81,12 +84,22 @@ CONFIANZA IA: [Alta / Media / Baja]
 
         try:
             response = self.model.generate_content(prompt)
-            return response.text.strip()
+            texto = response.text.strip()
+            
+            # Fallback si Gemini no sigue el formato
+            if "MEJOR APUESTA FINAL" not in texto or len(texto) < 30:
+                return f"""MEJOR APUESTA FINAL: {recomendacion}
+PROBABILIDAD ESTIMADA: {confianza}%
+RAZÓN PRINCIPAL: Análisis matemático sólido del motor v20
+RIESGO: Medio
+CONFIANZA IA: Media"""
+            
+            return texto
         except Exception as e:
             logger.error(f"Error Gemini: {e}")
             return f"""MEJOR APUESTA FINAL: {recomendacion}
 PROBABILIDAD ESTIMADA: {confianza}%
-RAZÓN PRINCIPAL: Error en Gemini - confiando en motor matemático
+RAZÓN PRINCIPAL: Error técnico en Gemini - confiando en motor
 RIESGO: Medio
 CONFIANZA IA: Media"""
 
