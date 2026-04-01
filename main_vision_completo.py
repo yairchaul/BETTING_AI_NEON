@@ -214,11 +214,12 @@ def main():
                 else:
                     st.warning("⚠️ No hay partidos MLB hoy")
 
-        if st.button("🥊 CARGAR UFC", use_container_width=True):
-            with st.spinner("Cargando UFC..."):
-                st.session_state.ufc_combates = st.session_state.scrapers['ufc'].get_events()
-                if st.session_state.ufc_combates:
-                    st.success(f"✅ {len(st.session_state.ufc_combates)} combates")
+if st.button("🥊 CARGAR UFC", use_container_width=True):
+    with st.spinner("Cargando cartelera UFC..."):
+        ufc_scraper = ESPN_UFC()
+        st.session_state.ufc_combates = ufc_scraper.get_events()
+        st.success(f"✅ {len(st.session_state.ufc_combates)} combates cargados")
+
                 else:
                     st.warning("⚠️ No hay eventos UFC disponibles")
 
