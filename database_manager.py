@@ -227,6 +227,32 @@ class DatabaseManager:
                     'z_medio': round(row[2], 2) if row[2] else 0
                 }
         except Exception as e:
+
+            def get_team_stats(self, team_name=None, deporte='nba', limit=5):
+    """
+    Obtiene estadísticas de equipos desde historial_equipos
+    """
+    conn = sqlite3.connect(self.db_path)
+    cursor = conn.cursor()
+    
+    if team_name:
+        cursor.execute('''
+            SELECT puntos_favor, puntos_contra, fecha 
+            FROM historial_equipos 
+            WHERE nombre_equipo = ? AND deporte = ?
+            ORDER BY fecha DESC LIMIT ?
+        ''', (team_name, deporte, limit))
+    else:
+        cursor.execute('''
+            SELECT nombre_equipo, puntos_favor, puntos_contra, fecha 
+            FROM historial_equipos 
+            WHERE deporte = ?
+            ORDER BY fecha DESC LIMIT ?
+        ''', (deporte, limit))
+    
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
             logger.error(f"Error obteniendo estadísticas aprendizaje: {e}")
             return {'error_medio': 0, 'total_errores': 0, 'z_medio': 0}
 
