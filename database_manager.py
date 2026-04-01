@@ -1,9 +1,13 @@
-﻿"""
+# -*- coding: utf-8 -*-
+"""
 DATABASE MANAGER - Con Bitácora de Errores y Z-Score
 """
+
 import sqlite3
 import logging
+import numpy as np
 from contextlib import contextmanager
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -62,6 +66,49 @@ class DatabaseManager:
             if conn:
                 conn.close()
     
+    def get_team_stats(self, team_name=None, deporte='nba', limit=5):
+        """
+        Obtiene estadísticas de equipos desde historial_equipos
+        """
+        try:
+            with self.get_connection() as conn:
+                cursor = conn.cursor()
+                
+                if team_name:
+                    cursor.execute('''
+                        SELECT puntos_favor, puntos_contra, fecha 
+                        FROM historial_equipos 
+                        WHERE nombre_equipo = ? AND deporte = ?
+                        ORDER BY fecha DESC LIMIT ?
+                    ''', (team_name, deporte, limit))
+                else:
+                    cursor.execute('''
+                        SELECT nombre_equipo, puntos_favor, puntos_contra, fecha 
+                        FROM historial_equipos 
+                        WHERE deporte = ?
+                        ORDER BY fecha DESC LIMIT ?
+                    ''', (deporte, limit))
+                
+                rows = cursor.fetchall()
+                
+                if team_name and rows:
+                    import numpy as np
+                    pts_favor = [r[0] for r in rows]
+                    pts_contra = [r[1] for r in rows]
+                    return {
+                        'promedio_favor': round(np.mean(pts_favor), 1),
+                        'promedio_contra': round(np.mean(pts_contra), 1),
+                        'desviacion_favor': round(np.std(pts_favor), 1),
+                        'ultimos_favor': pts_favor[:5],
+                        'ultimos_contra': pts_contra[:5],
+                        'partidos': len(rows)
+                    }
+                return rows
+                
+        except Exception as e:
+            logger.error(f"Error en get_team_stats: {e}")
+            return [] if not team_name else None
+    
     def calcular_estadisticas_equipo(self, equipo, deporte):
         """Calcula promedio y desviación estándar de un equipo"""
         try:
@@ -76,7 +123,6 @@ class DatabaseManager:
                 rows = cursor.fetchall()
                 
                 if rows and len(rows) >= 5:
-                    import numpy as np
                     puntos = [r[0] for r in rows]
                     promedio = np.mean(puntos)
                     desviacion = np.std(puntos)
@@ -97,7 +143,6 @@ class DatabaseManager:
             with self.get_connection() as conn:
                 cursor = conn.cursor()
                 error = abs(proyectado - real)
-                from datetime import datetime
                 fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 
                 cursor.execute('''
@@ -227,32 +272,6 @@ class DatabaseManager:
                     'z_medio': round(row[2], 2) if row[2] else 0
                 }
         except Exception as e:
-
-            def get_team_stats(self, team_name=None, deporte='nba', limit=5):
-    """
-    Obtiene estadísticas de equipos desde historial_equipos
-    """
-    conn = sqlite3.connect(self.db_path)
-    cursor = conn.cursor()
-    
-    if team_name:
-        cursor.execute('''
-            SELECT puntos_favor, puntos_contra, fecha 
-            FROM historial_equipos 
-            WHERE nombre_equipo = ? AND deporte = ?
-            ORDER BY fecha DESC LIMIT ?
-        ''', (team_name, deporte, limit))
-    else:
-        cursor.execute('''
-            SELECT nombre_equipo, puntos_favor, puntos_contra, fecha 
-            FROM historial_equipos 
-            WHERE deporte = ?
-            ORDER BY fecha DESC LIMIT ?
-        ''', (deporte, limit))
-    
-    rows = cursor.fetchall()
-    conn.close()
-    return rows
             logger.error(f"Error obteniendo estadísticas aprendizaje: {e}")
             return {'error_medio': 0, 'total_errores': 0, 'z_medio': 0}
 
