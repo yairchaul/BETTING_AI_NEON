@@ -1,19 +1,19 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """
-CEREBRO GEMINI PRO - Decisor Final Inteligente (Versión Optimizada 2026)
+CEREBRO GEMINI PRO - Decisor Final Inteligente (Versión Recomendada)
 """
 
 import os
 import logging
 import streamlit as st
 import google.generativeai as genai
-from typing import Dict, Any
+from typing import Dict
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class CerebroGeminiPro:
-    def __init__(self, api_key=None, modelo="gemini-2.5-flash"):
+    def __init__(self, api_key=None, modelo="gemini-1.5-flash"):
         if api_key:
             self.api_key = api_key
         elif hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
@@ -22,7 +22,7 @@ class CerebroGeminiPro:
             self.api_key = os.environ.get("GEMINI_API_KEY")
 
         if not self.api_key:
-            logger.warning("❌ No se encontró API key de Gemini")
+            logger.warning("❌ No hay API key de Gemini")
             self.model = None
             return
 
@@ -30,78 +30,72 @@ class CerebroGeminiPro:
             genai.configure(api_key=self.api_key)
             self.model = genai.GenerativeModel(
                 model_name=modelo,
-                generation_config={
-                    "temperature": 0.25,
-                    "top_p": 0.95,
-                    "top_k": 40,
-                    "max_output_tokens": 400,
-                }
+                generation_config={"temperature": 0.25, "max_output_tokens": 400}
             )
             logger.info(f"✅ Gemini Pro conectado ({modelo})")
         except Exception as e:
-            logger.error(f"Error: {e}")
+            logger.error(f"Error Gemini: {e}")
             self.model = None
 
-    def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis_heuristico: Dict) -> str:
+    def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis: Dict) -> str:
         if not self.model:
-            return "❌ Gemini no disponible - confiando en análisis matemático"
+            return "❌ Gemini no disponible - usando solo análisis matemático"
 
-        if deporte.lower() == "ufc":
-            local = partido.get('peleador1', {}).get('nombre', 'Desconocido')
-            visitante = partido.get('peleador2', {}).get('nombre', 'Desconocido')
+        # Extraer nombres según deporte
+        if deporte.upper() == "UFC":
+            local = partido.get('peleador1', {}).get('nombre', partido.get('peleador1', 'Local'))
+            visitante = partido.get('peleador2', {}).get('nombre', partido.get('peleador2', 'Visitante'))
         else:
-            local = partido.get('home', partido.get('local', 'Desconocido'))
-            visitante = partido.get('away', partido.get('visitante', 'Desconocido'))
+            local = partido.get('home', partido.get('local', 'Local'))
+            visitante = partido.get('away', partido.get('visitante', 'Visitante'))
 
-        recomendacion = analisis_heuristico.get('recomendacion', 'N/A')
-        confianza_math = analisis_heuristico.get('confianza', 0)
-        total_proyectado = analisis_heuristico.get('total_proyectado', 0)
-        edge = analisis_heuristico.get('edge', analisis_heuristico.get('ev_mejor', 0))
+        recomendacion = analisis.get('recomendacion', 'N/A')
+        confianza = analisis.get('confianza', 0)
+        total = analisis.get('total_proyectado', 0)
+        edge = analisis.get('edge', analisis.get('ev_mejor', 0))
+        prob = analisis.get('probabilidad', confianza)
 
         prompt = f"""
-Eres un analista profesional de apuestas deportivas con más de 15 años de experiencia.
+Eres un analista experto en apuestas deportivas. Sé honesto y conservador.
 
-**Deporte:** {deporte.upper()}
-**Partido:** {local} vs {visitante}
+Deporte: {deporte.upper()}
+Partido: {local} vs {visitante}
 
-**Análisis Matemático (Motor v20):**
+Análisis del Motor v20:
 - Recomendación: {recomendacion}
-- Confianza matemática: {confianza_math}%
-- Total proyectado: {total_proyectado}
-- Edge calculado: {edge:.1f}%
+- Confianza matemática: {confianza}%
+- Probabilidad: {prob}%
+- Total proyectado: {total}
+- Edge: {edge:.1f}%
 
-**Cuotas:** {partido.get('odds', 'No disponibles')}
+Decide la mejor apuesta final considerando tanto los números como factores cualitativos.
 
-Responde EXCLUSIVAMENTE con este formato:
+Responde **SOLO** con este formato exacto:
 
-MEJOR APUESTA FINAL: [OVER/UNDER/ML/SPREAD/BTTS/NO RECOMENDAR]
+MEJOR APUESTA FINAL: [OVER/UNDER/ML/SPREAD/BTTS/GANA LOCAL/GANA VISITANTE/NO RECOMENDAR]
 PROBABILIDAD ESTIMADA: XX%
-RAZÓN PRINCIPAL: [máximo una línea]
+RAZÓN PRINCIPAL: [una línea clara y concreta]
 RIESGO: [Bajo / Medio / Alto]
 CONFIANZA IA: [Alta / Media / Baja]
 """
+
         try:
             response = self.model.generate_content(prompt)
-            texto = response.text.strip()
-            if "MEJOR APUESTA FINAL" not in texto or len(texto) < 30:
-                return f"""MEJOR APUESTA FINAL: {recomendacion}
-PROBABILIDAD ESTIMADA: {confianza_math}%
-RAZÓN PRINCIPAL: Análisis matemático sólido del motor v20
-RIESGO: Medio
-CONFIANZA IA: Media"""
-            return texto
+            return response.text.strip()
         except Exception as e:
             logger.error(f"Error Gemini: {e}")
             return f"""MEJOR APUESTA FINAL: {recomendacion}
-PROBABILIDAD ESTIMADA: {confianza_math}%
+PROBABILIDAD ESTIMADA: {confianza}%
 RAZÓN PRINCIPAL: Error en Gemini - confiando en motor matemático
 RIESGO: Medio
 CONFIANZA IA: Media"""
 
     def analizar_con_decision(self, partido, analisis_heuristico):
+        """Método de compatibilidad con tu código anterior"""
         return self.orquestrar_decision_final("NBA", partido, analisis_heuristico)
 
     def generar_proyeccion(self, prompt: str):
+        """Genera proyección cuando faltan datos"""
         if not self.model:
             return None
         try:
@@ -110,5 +104,7 @@ CONFIANZA IA: Media"""
         except:
             return None
 
+
 def get_gemini(api_key=None):
+    """Función helper para mantener compatibilidad"""
     return CerebroGeminiPro(api_key)
