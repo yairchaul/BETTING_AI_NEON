@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 CEREBRO GEMINI PRO - Decisor Final Inteligente
-Versión definitiva con modelo estable
+Versión con detección automática del modelo disponible
 """
 
 import os
@@ -14,12 +14,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class CerebroGeminiPro:
-    def __init__(self, api_key=None, modelo="gemini-1.5-pro"):
+    def __init__(self, api_key=None):
         """
         Inicializa Gemini con la API key desde múltiples fuentes
-        MODELOS ESTABLES:
-        - gemini-1.5-pro (recomendado, más potente)
-        - gemini-1.5-flash (más rápido)
+        Detecta automáticamente el mejor modelo disponible
         """
         self.api_key = None
         
@@ -61,25 +59,69 @@ class CerebroGeminiPro:
         if not self.api_key:
             logger.error("❌ No se encontró API key de Gemini")
             self.model = None
+            self.model_name = None
             return
         
-        # Configurar Gemini con modelo estable
+        # Configurar Gemini con detección automática de modelo
         try:
             genai.configure(api_key=self.api_key)
             
-            # Usar modelo estable gemini-1.5-pro
+            # Listar modelos disponibles
+            modelos_disponibles = []
+            try:
+                for m in genai.list_models():
+                    if 'gemini' in m.name and 'generateContent' in m.supported_generation_methods:
+                        modelos_disponibles.append(m.name)
+                logger.info(f"Modelos Gemini disponibles: {modelos_disponibles}")
+            except Exception as e:
+                logger.warning(f"Error listando modelos: {e}")
+                modelos_disponibles = []
+            
+            # Seleccionar el mejor modelo disponible
+            self.model_name = self._seleccionar_mejor_modelo(modelos_disponibles)
+            
+            if not self.model_name:
+                logger.error("❌ No se encontró ningún modelo Gemini disponible")
+                self.model = None
+                return
+            
+            # Configurar generación
+            generation_config = {
+                "temperature": 0.3,
+                "max_output_tokens": 300,
+                "top_p": 0.95
+            }
+            
             self.model = genai.GenerativeModel(
-                model_name=modelo,
-                generation_config={
-                    "temperature": 0.3,
-                    "max_output_tokens": 300,
-                    "top_p": 0.95
-                }
+                model_name=self.model_name,
+                generation_config=generation_config
             )
-            logger.info(f"✅ Gemini Pro conectado exitosamente ({modelo})")
+            logger.info(f"✅ Gemini conectado exitosamente con modelo: {self.model_name}")
+            
         except Exception as e:
             logger.error(f"❌ Error conectando Gemini: {e}")
             self.model = None
+            self.model_name = None
+
+    def _seleccionar_mejor_modelo(self, modelos_disponibles):
+        """Selecciona el mejor modelo disponible en orden de preferencia"""
+        # Orden de preferencia (del mejor al menos preferido)
+        preferidos = [
+            'gemini-2.0-flash-exp',
+            'gemini-2.0-flash',
+            'gemini-1.5-pro',
+            'gemini-1.5-flash',
+            'gemini-pro',
+            'gemini-1.0-pro'
+        ]
+        
+        for preferido in preferidos:
+            for disponible in modelos_disponibles:
+                if preferido in disponible:
+                    return disponible
+        
+        # Si no encuentra ninguno de los preferidos, tomar el primero disponible
+        return modelos_disponibles[0] if modelos_disponibles else None
 
     def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis: Dict) -> str:
         """
