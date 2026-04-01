@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MAIN VISION COMPLETO - NEON V20 (Versión Final con todas las conexiones)
+MAIN VISION COMPLETO - NEON V20 (Versión Final Corregida)
 NBA, MLB, UFC, Fútbol con Player Props y Gemini integrado
 """
 
@@ -41,15 +41,11 @@ except ImportError:
 
 # ==================== FUNCIONES AUXILIARES ====================
 def get_gemini_api_key():
-    """Obtiene API key desde secrets o .env"""
-    # Primero intentar con st.secrets
     try:
         if hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
             return st.secrets['GEMINI_API_KEY']
     except:
         pass
-    
-    # Luego intentar con archivo .env
     try:
         with open('.env', 'r') as f:
             for linea in f:
@@ -57,16 +53,13 @@ def get_gemini_api_key():
                     return linea.split('=')[1].strip().strip('"').strip("'")
     except:
         pass
-    
     return ""
 
 def inicializar_bd_ufc():
-    """Inicializa BD UFC con estructura completa"""
     os.makedirs("data", exist_ok=True)
     try:
         conn = sqlite3.connect("data/betting_stats.db")
         cursor = conn.cursor()
-
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS eventos_ufc (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,7 +70,6 @@ def inicializar_bd_ufc():
                 fecha_evento TEXT
             )
         ''')
-
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS peleadores_ufc (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,8 +85,6 @@ def inicializar_bd_ufc():
                 ultima_actualizacion TEXT
             )
         ''')
-
-        # Insertar datos base si tabla vacía
         cursor.execute("SELECT COUNT(*) FROM peleadores_ufc")
         if cursor.fetchone()[0] == 0:
             peleadores = [
@@ -111,10 +101,7 @@ def inicializar_bd_ufc():
                     (nombre, record, altura, peso, alcance, postura, ko_rate, grappling, odds, ultima_actualizacion)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (*p, datetime.now().isoformat()))
-            logger.info("✅ Peleadores base insertados")
-
         conn.commit()
-        logger.info("✅ Base de datos UFC inicializada")
     except Exception as e:
         logger.error(f"Error BD UFC: {e}")
     finally:
@@ -122,15 +109,12 @@ def inicializar_bd_ufc():
             conn.close()
 
 def mostrar_player_props_nba(analisis):
-    """Muestra los player props de NBA"""
     col1, col2 = st.columns(2)
-    
     with col1:
         top3 = analisis.get('top_3pm_local')
         if top3:
             st.markdown(f"**🏀 {top3.get('nombre', 'N/A')}**")
             st.caption(f"🎯 {top3.get('triples_por_partido', 0)} triples/partido")
-    
     with col2:
         top3 = analisis.get('top_3pm_visit')
         if top3:
@@ -138,9 +122,7 @@ def mostrar_player_props_nba(analisis):
             st.caption(f"🎯 {top3.get('triples_por_partido', 0)} triples/partido")
 
 def mostrar_player_props_mlb(analisis):
-    """Muestra los player props de MLB"""
     col1, col2 = st.columns(2)
-    
     with col1:
         hr = analisis.get('top_hr_local')
         if hr:
@@ -151,7 +133,6 @@ def mostrar_player_props_mlb(analisis):
             else:
                 st.markdown(f"**⚾ {hr.get('nombre', 'N/A')}**")
                 st.caption(f"💪 {hr.get('hr', 0)} HR")
-    
     with col2:
         hr = analisis.get('top_hr_visit')
         if hr:
@@ -186,7 +167,6 @@ def main():
             'futbol': analizar_futbol_pro_v20
         }
         
-        # Gemini
         gemini_key = get_gemini_api_key()
         if gemini_key and CerebroGeminiPro:
             st.session_state.gemini = CerebroGeminiPro(gemini_key)
@@ -235,17 +215,12 @@ def main():
         st.markdown("---")
         st.subheader("⚽ FÚTBOL")
         
-        # Buscador de ligas
         buscar_liga = st.text_input("🔍 Buscar liga:", placeholder="Ej: Premier, LaLiga, Liga MX...")
-        
-        # Obtener todas las ligas disponibles del scraper
         todas_ligas = st.session_state.scrapers['futbol'].get_available_leagues()
         
-        # Filtrar según búsqueda
         if buscar_liga:
             ligas_filtradas = [l for l in todas_ligas if buscar_liga.lower() in l.lower()]
         else:
-            # Mostrar primeras 20 ligas si no hay búsqueda
             ligas_filtradas = todas_ligas[:20]
         
         st.caption(f"📋 {len(todas_ligas)} ligas disponibles en total")
@@ -281,12 +256,9 @@ def main():
                         try:
                             resultado = st.session_state.motores['nba'](p)
                             render_analisis_card(resultado)
-                            
-                            # Mostrar player props si existen
                             if resultado.get('top_3pm_local') or resultado.get('top_3pm_visit'):
                                 st.markdown("### 🏀 MÁXIMOS TRIPLEROS")
                                 mostrar_player_props_nba(resultado)
-                            
                             if st.session_state.gemini:
                                 gemini_resp = st.session_state.gemini.orquestrar_decision_final("NBA", p, resultado)
                                 st.markdown("### 🤖 GEMINI - DECISOR FINAL")
@@ -297,22 +269,47 @@ def main():
         else:
             st.info("👈 Carga NBA en el sidebar")
 
-    # UFC TAB
+    # UFC TAB - CORREGIDO
     with tab2:
         if st.session_state.ufc_combates:
             for idx, c in enumerate(st.session_state.ufc_combates):
-                p1 = c.get('peleador1', {}).get('nombre', '')
-                p2 = c.get('peleador2', {}).get('nombre', '')
-                partido_visual = {'peleador1': p1, 'peleador2': p2}
+                # Extraer nombres correctamente
+                if isinstance(c, dict):
+                    p1 = c.get('peleador1', {})
+                    p2 = c.get('peleador2', {})
+                    
+                    if isinstance(p1, str):
+                        p1_nombre = p1
+                        p1 = {'nombre': p1_nombre}
+                    else:
+                        p1_nombre = p1.get('nombre', '')
+                    
+                    if isinstance(p2, str):
+                        p2_nombre = p2
+                        p2 = {'nombre': p2_nombre}
+                    else:
+                        p2_nombre = p2.get('nombre', '')
+                else:
+                    p1_nombre = ''
+                    p2_nombre = ''
+                    p1 = {'nombre': ''}
+                    p2 = {'nombre': ''}
                 
-                # Usar el visual UFC
+                partido_visual = {
+                    'peleador1': p1,
+                    'peleador2': p2
+                }
+                
                 accion = st.session_state.visual_ufc.render(partido_visual, idx, st.session_state.tracker, None)
+                
                 if accion == "analizar":
                     with st.spinner("🥊 Analizando UFC..."):
                         try:
-                            resultado = st.session_state.motores['ufc']({"peleador1": p1, "peleador2": p2})
+                            resultado = st.session_state.motores['ufc']({
+                                "peleador1": p1_nombre,
+                                "peleador2": p2_nombre
+                            })
                             render_analisis_card(resultado)
-                            
                             if st.session_state.gemini:
                                 gemini_resp = st.session_state.gemini.orquestrar_decision_final("UFC", partido_visual, resultado)
                                 st.markdown("### 🤖 GEMINI - DECISOR FINAL")
@@ -336,7 +333,6 @@ def main():
                                 try:
                                     resultado = st.session_state.motores['futbol'](p)
                                     render_analisis_card(resultado)
-                                    
                                     if st.session_state.gemini:
                                         gemini_resp = st.session_state.gemini.orquestrar_decision_final("FÚTBOL", p, resultado)
                                         st.markdown("### 🤖 GEMINI - DECISOR FINAL")
@@ -357,12 +353,9 @@ def main():
                         try:
                             resultado = st.session_state.motores['mlb'](p)
                             render_analisis_card(resultado)
-                            
-                            # Mostrar player props si existen
                             if resultado.get('top_hr_local') or resultado.get('top_hr_visit'):
                                 st.markdown("### ⚾ CANDIDATOS A HOME RUN")
                                 mostrar_player_props_mlb(resultado)
-                            
                             if st.session_state.gemini:
                                 gemini_resp = st.session_state.gemini.orquestrar_decision_final("MLB", p, resultado)
                                 st.markdown("### 🤖 GEMINI - DECISOR FINAL")
