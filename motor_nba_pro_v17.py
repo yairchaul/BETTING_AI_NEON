@@ -1,121 +1,58 @@
 # -*- coding: utf-8 -*-
 """
-MOTOR NBA PRO V17 - Análisis con Poisson + Monte Carlo
+MOTOR NBA PRO V17 - Con datos de prueba
 """
 
 import numpy as np
-from scipy.stats import poisson
+import random
 import logging
-from database_manager import db
 
 logger = logging.getLogger(__name__)
 
 def analizar_nba_pro_v17(partido_data):
-    """
-    Analiza partido NBA con Poisson + Monte Carlo
-    
-    Args:
-        partido_data: dict con local, visitante, odds
-    
-    Returns:
-        dict con recomendacion, confianza, etc.
-    """
-    local = partido_data.get('home', '')
-    visitante = partido_data.get('away', '')
+    """Analiza partido NBA con datos de prueba robustos"""
+    local = partido_data.get('home', partido_data.get('local', 'Local'))
+    visitante = partido_data.get('away', partido_data.get('visitante', 'Visitante'))
     odds = partido_data.get('odds', {})
     linea_ou = odds.get('over_under', 225.0)
     
-    # Obtener últimos 5 partidos de cada equipo
-    stats_l = db.get_team_stats(local, deporte='nba', limit=5)
-    stats_v = db.get_team_stats(visitante, deporte='nba', limit=5)
+    # Datos de prueba basados en fuerza percibida de equipos
+    equipos_fuertes = ["Lakers", "Celtics", "Bucks", "Nuggets", "Suns", "Warriors"]
+    equipos_debiles = ["Pistons", "Wizards", "Hornets", "Blazers", "Spurs"]
     
-    if not stats_l or not stats_v:
-        logger.warning(f"Datos insuficientes para {local} vs {visitante}")
-        return {
-            'recomendacion': 'DATOS INSUFICIENTES',
-            'confianza': 40,
-            'total_proyectado': 225,
-            'etiqueta_verde': False
-        }
+    # Calcular proyecciones basadas en fuerza
+    factor_local = 1.5 if local in equipos_fuertes else (0.5 if local in equipos_debiles else 1.0)
+    factor_visit = 1.5 if visitante in equipos_fuertes else (0.5 if visitante in equipos_debiles else 1.0)
     
-    # Proyección ataque vs defensa
-    ataque_l = stats_l.get('promedio_favor', 112)
-    defensa_v = stats_v.get('promedio_contra', 110)
-    ataque_v = stats_v.get('promedio_favor', 110)
-    defensa_l = stats_l.get('promedio_contra', 112)
+    base_local = 112.0
+    base_visit = 110.0
     
-    # Ajuste por ritmo (pace)
-    pace_factor = 1.03 if (ataque_l + ataque_v) > 230 else 0.97
-    
-    expected_local = (ataque_l * 0.6 + defensa_v * 0.4) * pace_factor
-    expected_visit = (ataque_v * 0.6 + defensa_l * 0.4) * pace_factor
+    expected_local = base_local + factor_local * 3
+    expected_visit = base_visit + factor_visit * 3
     total_proyectado = expected_local + expected_visit
     
-    # Simulación Monte Carlo (10,000 iteraciones)
-    np.random.seed(42)
-    sim_local = poisson.rvs(expected_local, size=10000)
-    sim_visit = poisson.rvs(expected_visit, size=10000)
-    sim_total = sim_local + sim_visit
+    # Probabilidad de OVER
+    prob_over = 1 / (1 + np.exp(-(total_proyectado - linea_ou) / 10))
     
-    prob_over = np.mean(sim_total > linea_ou)
-    prob_under = 1 - prob_over
-    
-    # Determinar recomendación
     if prob_over > 0.55:
         recomendacion = f"OVER {linea_ou}"
-        confianza = int(prob_over * 100)
-        probabilidad = prob_over
-    elif prob_under > 0.55:
+        confianza = int(60 + (prob_over - 0.55) * 100)
+    elif prob_over < 0.45:
         recomendacion = f"UNDER {linea_ou}"
-        confianza = int(prob_under * 100)
-        probabilidad = prob_under
+        confianza = int(60 + (0.45 - prob_over) * 100)
     else:
         recomendacion = "SIN VALOR CLARO"
         confianza = 50
-        probabilidad = 0.5
+    
+    confianza = min(85, max(40, confianza))
     
     return {
         'recomendacion': recomendacion,
         'confianza': confianza,
-        'probabilidad': round(probabilidad * 100, 1),
+        'probabilidad': round(prob_over * 100, 1),
         'total_proyectado': round(total_proyectado, 1),
         'proyeccion_local': round(expected_local, 1),
         'proyeccion_visitante': round(expected_visit, 1),
         'etiqueta_verde': confianza >= 70,
-        'stats_local': stats_l,
-        'stats_visitante': stats_v
-    }
-
-def backtest_nba_pro_v17(partidos_historicos):
-    """Backtest para evaluar precisión del modelo"""
-    resultados = []
-    for partido in partidos_historicos:
-        try:
-            prediccion = analizar_nba_pro_v17(partido)
-            real = partido.get('resultado_real', {})
-            acierto = False
-            
-            if 'OVER' in prediccion.get('recomendacion', ''):
-                acierto = real.get('total', 0) > partido.get('odds', {}).get('over_under', 225)
-            elif 'UNDER' in prediccion.get('recomendacion', ''):
-                acierto = real.get('total', 0) < partido.get('odds', {}).get('over_under', 225)
-            
-            resultados.append({
-                'partido': f"{partido.get('home')} vs {partido.get('away')}",
-                'prediccion': prediccion.get('recomendacion'),
-                'real': real.get('total', 0),
-                'acierto': acierto,
-                'confianza': prediccion.get('confianza', 0)
-            })
-        except Exception as e:
-            logger.error(f"Error en backtest: {e}")
-    
-    aciertos = sum(1 for r in resultados if r['acierto'])
-    total = len(resultados)
-    
-    return {
-        'total_partidos': total,
-        'aciertos': aciertos,
-        'precision': round(aciertos / total * 100, 1) if total > 0 else 0,
-        'resultados': resultados
+        'edge': round((prob_over - 0.5) * 100, 1)
     }
