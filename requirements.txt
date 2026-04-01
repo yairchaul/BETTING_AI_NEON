@@ -9,5 +9,3 @@ lxml
 python-dotenv
 cloudscraper
 scipy
-selenium
-webdriver-manager
