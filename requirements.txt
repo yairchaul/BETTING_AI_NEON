@@ -8,4 +8,6 @@ beautifulsoup4
 lxml
 python-dotenv
 cloudscraper
-scipy>=1.10.0
+scipy
+selenium
+webdriver-manager
