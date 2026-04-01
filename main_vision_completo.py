@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MAIN VISION COMPLETO - NEON V20 (Versión Final - Estable y Robusta)
-Mejoras sin romper nada esencial
+MAIN VISION COMPLETO - NEON V20 (Versión Final Estable y Optimizada)
 """
 
 import streamlit as st
@@ -29,29 +28,10 @@ from database_manager import db
 from render_unificado import render_analisis_card
 
 # ==================== MOTORES V20 ====================
-try:
-    from motor_nba_pro_v17 import analizar_nba_pro_v17
-except ImportError:
-    analizar_nba_pro_v17 = None
-    logger.warning("motor_nba_pro_v17 no disponible")
-
-try:
-    from motor_mlb_pro import analizar_mlb_pro_v20
-except ImportError:
-    analizar_mlb_pro_v20 = None
-    logger.warning("motor_mlb_pro no disponible")
-
-try:
-    from motor_ufc_pro import analizar_ufc_pro_v20
-except ImportError:
-    analizar_ufc_pro_v20 = None
-    logger.warning("motor_ufc_pro no disponible")
-
-try:
-    from motor_fut_pro import analizar_futbol_pro_v20
-except ImportError:
-    analizar_futbol_pro_v20 = None
-    logger.warning("motor_fut_pro no disponible")
+from motor_nba_pro_v17 import analizar_nba_pro_v17
+from motor_mlb_pro import analizar_mlb_pro_v20
+from motor_ufc_pro import analizar_ufc_pro_v20
+from motor_fut_pro import analizar_futbol_pro_v20
 
 # ==================== GEMINI PRO ====================
 try:
@@ -71,72 +51,81 @@ def get_gemini_api_key():
         return ""
 
 def inicializar_bd_ufc():
-    """Inicializa BD UFC con datos de prueba"""
+    """Inicializa BD UFC de forma segura y limpia"""
     os.makedirs("data", exist_ok=True)
-    conn = sqlite3.connect("data/betting_stats.db")
-    cursor = conn.cursor()
-    
-    # Tabla eventos
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS eventos_ufc (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT,
-            fecha TEXT,
-            cartelera TEXT,
-            ultima_actualizacion TEXT
-        )
-    ''')
-    
-    # Tabla peleadores
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS peleadores_ufc (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT UNIQUE,
-            record TEXT,
-            altura REAL,
-            peso REAL,
-            alcance REAL,
-            postura TEXT,
-            ko_rate REAL,
-            grappling REAL,
-            odds TEXT,
-            ultima_actualizacion TEXT
-        )
-    ''')
-    
-    # Datos de prueba si está vacío
-    cursor.execute("SELECT COUNT(*) FROM peleadores_ufc")
-    if cursor.fetchone()[0] == 0:
-        peleadores = [
-            ("Israel Adesanya", "24-5-0", 193, 84, 203, "Freestyle", 0.9, 0.5, "-120"),
-            ("Joe Pyfer", "15-3-0", 188, 84, 190, "Boxing", 0.6, 0.5, "-106"),
-            ("Bruna Brasil", "11-6-1", 167, 52, 166, "MMA", 0.9, 0.5, "+390"),
-            ("Alexia Thainara", "13-1-0", 162, 52, 170, "MMA", 0.5, 0.5, "-520"),
-            ("Maycee Barber", "15-2-0", 165, 57, 165, "MMA", 0.9, 0.5, "-148"),
-            ("Alexa Grasso", "16-5-1", 165, 57, 167, "MMA", 0.5, 0.6, "+124"),
-        ]
-        for p in peleadores:
-            cursor.execute('''
-                INSERT OR IGNORE INTO peleadores_ufc 
-                (nombre, record, altura, peso, alcance, postura, ko_rate, grappling, odds, ultima_actualizacion)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (*p, datetime.now().isoformat()))
-    
-    # Evento de prueba
-    cursor.execute("SELECT COUNT(*) FROM eventos_ufc")
-    if cursor.fetchone()[0] == 0:
-        cartelera = [
-            {"peleador1": "Israel Adesanya", "peleador2": "Joe Pyfer"},
-            {"peleador1": "Bruna Brasil", "peleador2": "Alexia Thainara"},
-        ]
+    try:
+        conn = sqlite3.connect("data/betting_stats.db")
+        cursor = conn.cursor()
+
+        # Tabla eventos
         cursor.execute('''
-            INSERT INTO eventos_ufc (nombre, fecha, cartelera, ultima_actualizacion)
-            VALUES (?, ?, ?, ?)
-        ''', ("UFC Fight Night", datetime.now().strftime("%Y-%m-%d"), json.dumps(cartelera), datetime.now().isoformat()))
-    
-    conn.commit()
-    conn.close()
-    logger.info("✅ Base de datos UFC inicializada")
+            CREATE TABLE IF NOT EXISTS eventos_ufc (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT,
+                fecha TEXT,
+                cartelera TEXT,
+                ultima_actualizacion TEXT
+            )
+        ''')
+
+        # Tabla peleadores (id autoincremental)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS peleadores_ufc (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT UNIQUE,
+                record TEXT,
+                altura REAL,
+                peso REAL,
+                alcance REAL,
+                postura TEXT,
+                ko_rate REAL,
+                grappling REAL,
+                odds TEXT,
+                ultima_actualizacion TEXT
+            )
+        ''')
+
+        # Insertar datos de prueba SOLO si la tabla está vacía
+        cursor.execute("SELECT COUNT(*) FROM peleadores_ufc")
+        if cursor.fetchone()[0] == 0:
+            peleadores_prueba = [
+                ("Israel Adesanya", "24-5-0", 193, 84, 203, "Freestyle", 0.9, 0.5, "-120"),
+                ("Joe Pyfer", "15-3-0", 188, 84, 190, "Boxing", 0.6, 0.5, "-106"),
+                ("Bruna Brasil", "11-6-1", 167, 52, 166, "MMA", 0.9, 0.5, "+390"),
+                ("Alexia Thainara", "13-1-0", 162, 52, 170, "MMA", 0.5, 0.5, "-520"),
+                ("Maycee Barber", "15-2-0", 165, 57, 165, "MMA", 0.9, 0.5, "-148"),
+                ("Alexa Grasso", "16-5-1", 165, 57, 167, "MMA", 0.5, 0.6, "+124"),
+            ]
+            for p in peleadores_prueba:
+                cursor.execute('''
+                    INSERT OR IGNORE INTO peleadores_ufc 
+                    (nombre, record, altura, peso, alcance, postura, ko_rate, grappling, odds, ultima_actualizacion)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (*p, datetime.now().isoformat()))
+            logger.info(f"✅ Insertados {len(peleadores_prueba)} peleadores de prueba")
+
+        # Insertar evento de prueba si no existe
+        cursor.execute("SELECT COUNT(*) FROM eventos_ufc")
+        if cursor.fetchone()[0] == 0:
+            cartelera_prueba = [
+                {"peleador1": "Israel Adesanya", "peleador2": "Joe Pyfer"},
+                {"peleador1": "Bruna Brasil", "peleador2": "Alexia Thainara"},
+            ]
+            cursor.execute('''
+                INSERT INTO eventos_ufc (nombre, fecha, cartelera, ultima_actualizacion)
+                VALUES (?, ?, ?, ?)
+            ''', ("UFC Fight Night", datetime.now().strftime("%Y-%m-%d"), json.dumps(cartelera_prueba), datetime.now().isoformat()))
+            logger.info("✅ Evento de prueba UFC insertado")
+
+        conn.commit()
+        logger.info("✅ Base de datos UFC inicializada correctamente")
+
+    except Exception as e:
+        logger.error(f"❌ Error inicializando BD UFC: {e}")
+        st.warning(f"⚠️ Error en BD UFC: {e}")
+    finally:
+        if 'conn' in locals():
+            conn.close()
 
 def obtener_peleador_detalle(nombre):
     try:
@@ -162,26 +151,10 @@ def obtener_peleador_detalle(nombre):
     except:
         return None
 
-def obtener_cartelera_ufc():
-    """Obtiene la cartelera UFC desde la BD"""
-    try:
-        conn = sqlite3.connect("data/betting_stats.db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT cartelera FROM eventos_ufc ORDER BY id DESC LIMIT 1")
-        row = cursor.fetchone()
-        conn.close()
-        if row and row[0]:
-            return json.loads(row[0])
-        return []
-    except:
-        return []
-
 def main():
     if 'init' not in st.session_state:
-        # Inicializar BD UFC
         inicializar_bd_ufc()
         
-        # Scrapers
         st.session_state.scrapers = {
             'nba': ESPN_NBA(),
             'mlb': ESPN_MLB(),
@@ -194,7 +167,7 @@ def main():
         st.session_state.visual_futbol = VisualFutbolTriple()
         st.session_state.visual_mlb = VisualMLB()
         
-        # Motores
+        # Motores v20
         st.session_state.motores = {
             'nba': analizar_nba_pro_v17,
             'mlb': analizar_mlb_pro_v20,
@@ -211,7 +184,6 @@ def main():
             st.session_state.gemini = None
             st.warning("⚠️ Gemini no disponible - Solo análisis matemático")
         
-        # Estado
         st.session_state.nba_partidos = []
         st.session_state.ufc_combates = []
         st.session_state.futbol_partidos = {}
@@ -242,18 +214,11 @@ def main():
 
         if st.button("🥊 CARGAR UFC", use_container_width=True):
             with st.spinner("Cargando UFC..."):
-                # Intentar obtener cartelera desde BD primero
-                cartelera = obtener_cartelera_ufc()
-                if cartelera:
-                    st.session_state.ufc_combates = cartelera
-                    st.success(f"✅ {len(cartelera)} combates desde BD")
+                st.session_state.ufc_combates = st.session_state.scrapers['ufc'].get_events()
+                if st.session_state.ufc_combates:
+                    st.success(f"✅ {len(st.session_state.ufc_combates)} combates")
                 else:
-                    # Fallback al scraper
-                    st.session_state.ufc_combates = st.session_state.scrapers['ufc'].get_events()
-                    if st.session_state.ufc_combates:
-                        st.success(f"✅ {len(st.session_state.ufc_combates)} combates")
-                    else:
-                        st.warning("⚠️ No hay eventos UFC disponibles")
+                    st.warning("⚠️ No hay eventos UFC disponibles")
 
         st.markdown("---")
         st.subheader("⚽ FÚTBOL")
@@ -310,10 +275,9 @@ def main():
     with tab2:
         if st.session_state.ufc_combates:
             for idx, c in enumerate(st.session_state.ufc_combates):
-                p1 = c.get('peleador1', '')
-                p2 = c.get('peleador2', '')
+                p1 = c.get('peleador1', {}).get('nombre', '')
+                p2 = c.get('peleador2', {}).get('nombre', '')
                 
-                # Crear partido para visual
                 partido_visual = {
                     'peleador1': {'nombre': p1},
                     'peleador2': {'nombre': p2}
