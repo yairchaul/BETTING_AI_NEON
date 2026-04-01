@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-MAIN VISION COMPLETO - NEON V20 (Versión Final Optimizada)
-Scraper UFC robusto + Motores v20 + Gemini mejorado
+MAIN VISION COMPLETO - NEON V20 (Versión Final 100% Funcional)
+NBA + MLB con Player Props | UFC Scraper Robusto | Gemini Optimizado
 """
 
 import streamlit as st
@@ -10,7 +10,6 @@ import pandas as pd
 import os
 import logging
 import sqlite3
-import json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,12 +33,11 @@ from motor_mlb_pro import analizar_mlb_pro_v20
 from motor_ufc_pro import analizar_ufc_pro_v20
 from motor_fut_pro import analizar_futbol_pro_v20
 
-# ==================== GEMINI PRO ====================
+# ==================== GEMINI ====================
 try:
     from cerebro_gemini_pro import CerebroGeminiPro
 except ImportError:
     CerebroGeminiPro = None
-    logger.warning("cerebro_gemini_pro no encontrado")
 
 # ==================== FUNCIONES AUXILIARES ====================
 def get_gemini_api_key():
@@ -52,23 +50,19 @@ def get_gemini_api_key():
         return ""
 
 def inicializar_bd_ufc():
-    """Inicializa BD UFC con estructura correcta"""
     os.makedirs("data", exist_ok=True)
     try:
         conn = sqlite3.connect("data/betting_stats.db")
         cursor = conn.cursor()
-
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS eventos_ufc (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 nombre TEXT,
                 fecha TEXT,
                 cartelera TEXT,
-                ultima_actualizacion TEXT,
-                fecha_evento TEXT
+                ultima_actualizacion TEXT
             )
         ''')
-
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS peleadores_ufc (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -84,31 +78,53 @@ def inicializar_bd_ufc():
                 ultima_actualizacion TEXT
             )
         ''')
-
-        # Insertar peleadores base si no existen
-        cursor.execute("SELECT COUNT(*) FROM peleadores_ufc")
-        if cursor.fetchone()[0] == 0:
-            peleadores = [
-                ("Israel Adesanya", "24-5-0", 193, 84, 203, "Freestyle", 0.9, 0.5, "-120"),
-                ("Joe Pyfer", "15-3-0", 188, 84, 190, "Boxing", 0.6, 0.5, "-106"),
-                ("Bruna Brasil", "11-6-1", 167, 52, 166, "MMA", 0.9, 0.5, "+390"),
-                ("Alexia Thainara", "13-1-0", 162, 52, 170, "MMA", 0.5, 0.5, "-520"),
-            ]
-            for p in peleadores:
-                cursor.execute('''
-                    INSERT OR IGNORE INTO peleadores_ufc 
-                    (nombre, record, altura, peso, alcance, postura, ko_rate, grappling, odds, ultima_actualizacion)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (*p, datetime.now().isoformat()))
-            logger.info("✅ Peleadores base insertados")
-
         conn.commit()
-        logger.info("✅ Base de datos UFC inicializada")
+        conn.close()
+        logger.info("✅ BD UFC inicializada")
     except Exception as e:
-        logger.error(f"Error inicializando BD: {e}")
-    finally:
-        if 'conn' in locals():
-            conn.close()
+        logger.error(f"Error BD UFC: {e}")
+
+def mostrar_player_props_nba(analisis):
+    """Muestra los player props de NBA"""
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        top3 = analisis.get('top_3pm_local')
+        if top3:
+            st.markdown(f"**🏀 {top3.get('nombre', 'N/A')}**")
+            st.caption(f"🎯 {top3.get('triples_por_partido', 0)} triples/partido | {top3.get('porcentaje_triples', 0):.1f}%")
+    
+    with col2:
+        top3 = analisis.get('top_3pm_visit')
+        if top3:
+            st.markdown(f"**🏀 {top3.get('nombre', 'N/A')}**")
+            st.caption(f"🎯 {top3.get('triples_por_partido', 0)} triples/partido | {top3.get('porcentaje_triples', 0):.1f}%")
+
+def mostrar_player_props_mlb(analisis):
+    """Muestra los player props de MLB"""
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        hr = analisis.get('top_hr_local')
+        if hr:
+            if isinstance(hr, list):
+                for h in hr[:2]:
+                    st.markdown(f"**⚾ {h.get('nombre', 'N/A')}**")
+                    st.caption(f"💪 {h.get('hr', 0)} HR | AVG {h.get('avg', 0):.3f}")
+            else:
+                st.markdown(f"**⚾ {hr.get('nombre', 'N/A')}**")
+                st.caption(f"💪 {hr.get('hr', 0)} HR | AVG {hr.get('avg', 0):.3f}")
+    
+    with col2:
+        hr = analisis.get('top_hr_visit')
+        if hr:
+            if isinstance(hr, list):
+                for h in hr[:2]:
+                    st.markdown(f"**⚾ {h.get('nombre', 'N/A')}**")
+                    st.caption(f"💪 {h.get('hr', 0)} HR | AVG {h.get('avg', 0):.3f}")
+            else:
+                st.markdown(f"**⚾ {hr.get('nombre', 'N/A')}**")
+                st.caption(f"💪 {hr.get('hr', 0)} HR | AVG {hr.get('avg', 0):.3f}")
 
 def main():
     if 'init' not in st.session_state:
@@ -117,7 +133,7 @@ def main():
         st.session_state.scrapers = {
             'nba': ESPN_NBA(),
             'mlb': ESPN_MLB(),
-            'ufc': ESPN_UFC(),          # ← Scraper mejorado
+            'ufc': ESPN_UFC(),
             'futbol': ESPN_FUTBOL()
         }
         st.session_state.tracker = BetTracker()
@@ -126,7 +142,6 @@ def main():
         st.session_state.visual_futbol = VisualFutbolTriple()
         st.session_state.visual_mlb = VisualMLB()
         
-        # Motores v20
         st.session_state.motores = {
             'nba': analizar_nba_pro_v17,
             'mlb': analizar_mlb_pro_v20,
@@ -134,14 +149,13 @@ def main():
             'futbol': analizar_futbol_pro_v20
         }
         
-        # Gemini
         gemini_key = get_gemini_api_key()
         if gemini_key and CerebroGeminiPro:
             st.session_state.gemini = CerebroGeminiPro(gemini_key)
-            st.success("✅ Gemini conectado - Decisor Final activo")
+            st.success("✅ Gemini conectado")
         else:
             st.session_state.gemini = None
-            st.warning("⚠️ Gemini no disponible - Solo análisis matemático")
+            st.warning("⚠️ Gemini no disponible")
         
         st.session_state.nba_partidos = []
         st.session_state.ufc_combates = []
@@ -166,13 +180,10 @@ def main():
                 st.success(f"✅ {len(st.session_state.mlb_partidos)} partidos") if st.session_state.mlb_partidos else st.warning("No hay partidos MLB hoy")
 
         if st.button("🥊 CARGAR UFC", use_container_width=True):
-            with st.spinner("🔄 Buscando cartelera UFC actual (100% dinámico)..."):
-                ufc_scraper = st.session_state.scrapers['ufc']
-                st.session_state.ufc_combates = ufc_scraper.get_events()
-                if st.session_state.ufc_combates:
-                    st.success(f"✅ {len(st.session_state.ufc_combates)} combates cargados")
-                else:
-                    st.info("ℹ️ No hay eventos UFC disponibles en este momento")
+            with st.spinner("Cargando UFC..."):
+                ufc = st.session_state.scrapers['ufc']
+                st.session_state.ufc_combates = ufc.get_events()
+                st.success(f"✅ {len(st.session_state.ufc_combates)} combates") if st.session_state.ufc_combates else st.info("No hay eventos UFC disponibles")
 
         st.markdown("---")
         st.subheader("⚽ FÚTBOL")
@@ -198,7 +209,8 @@ def main():
     # ==================== TABS ====================
     tab1, tab2, tab3, tab4 = st.tabs(["🏀 NBA", "🥊 UFC", "⚽ FÚTBOL", "⚾ MLB"])
 
-    with tab1:  # NBA
+    # NBA TAB
+    with tab1:
         if st.session_state.nba_partidos:
             for idx, p in enumerate(st.session_state.nba_partidos):
                 accion = st.session_state.visual_nba.render(p, idx, st.session_state.tracker, None, None, None)
@@ -207,6 +219,12 @@ def main():
                         try:
                             resultado = st.session_state.motores['nba'](p)
                             render_analisis_card(resultado)
+                            
+                            # Mostrar player props de NBA
+                            if resultado.get('top_3pm_local') or resultado.get('top_3pm_visit'):
+                                st.markdown("### 🏀 MÁXIMOS TRIPLEROS")
+                                mostrar_player_props_nba(resultado)
+                            
                             if st.session_state.gemini:
                                 gemini_resp = st.session_state.gemini.orquestrar_decision_final("NBA", p, resultado)
                                 st.markdown("### 🤖 GEMINI - DECISOR FINAL")
@@ -217,16 +235,13 @@ def main():
         else:
             st.info("👈 Carga NBA en el sidebar")
 
-    with tab2:  # UFC
+    # UFC TAB
+    with tab2:
         if st.session_state.ufc_combates:
             for idx, c in enumerate(st.session_state.ufc_combates):
                 p1 = c.get('peleador1', {}).get('nombre', '')
                 p2 = c.get('peleador2', {}).get('nombre', '')
-                
-                partido_visual = {
-                    'peleador1': {'nombre': p1},
-                    'peleador2': {'nombre': p2}
-                }
+                partido_visual = {'peleador1': {'nombre': p1}, 'peleador2': {'nombre': p2}}
                 
                 accion = st.session_state.visual_ufc.render(partido_visual, idx, st.session_state.tracker, None)
                 if accion == "analizar":
@@ -244,7 +259,8 @@ def main():
         else:
             st.info("👈 Carga UFC en el sidebar")
 
-    with tab3:  # FÚTBOL
+    # FÚTBOL TAB
+    with tab3:
         if st.session_state.futbol_partidos:
             for liga, partidos in st.session_state.futbol_partidos.items():
                 if partidos:
@@ -266,7 +282,8 @@ def main():
         else:
             st.info("👈 Carga ligas en el sidebar")
 
-    with tab4:  # MLB
+    # MLB TAB
+    with tab4:
         if st.session_state.mlb_partidos:
             for idx, p in enumerate(st.session_state.mlb_partidos):
                 accion = st.session_state.visual_mlb.render(p, idx, st.session_state.tracker, None, None, None)
@@ -275,6 +292,12 @@ def main():
                         try:
                             resultado = st.session_state.motores['mlb'](p)
                             render_analisis_card(resultado)
+                            
+                            # Mostrar player props de MLB
+                            if resultado.get('top_hr_local') or resultado.get('top_hr_visit'):
+                                st.markdown("### ⚾ CANDIDATOS A HOME RUN")
+                                mostrar_player_props_mlb(resultado)
+                            
                             if st.session_state.gemini:
                                 gemini_resp = st.session_state.gemini.orquestrar_decision_final("MLB", p, resultado)
                                 st.markdown("### 🤖 GEMINI - DECISOR FINAL")
@@ -285,7 +308,7 @@ def main():
         else:
             st.info("👈 Carga MLB en el sidebar")
 
-    # ==================== PROFIT CARD ====================
+    # Profit card
     try:
         if os.path.exists("data/bitacora_maestra.csv"):
             df = pd.read_csv("data/bitacora_maestra.csv")
