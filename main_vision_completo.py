@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-MAIN VISION COMPLETO - NEON V20 (Versión Final con Multi-IA)
-NBA, MLB, UFC, Fútbol con Gemini + Grok + DeepSeek
+MAIN VISION COMPLETO - NEON V20 (Versión Corregida - sin texto fantasma)
 """
 
 import streamlit as st
@@ -33,14 +32,28 @@ from motor_mlb_pro import analizar_mlb_pro_v20
 from motor_ufc_pro import analizar_ufc_pro_v20
 from motor_fut_pro import analizar_futbol_pro_v20
 
-# ==================== MULTI-IA ====================
+# ==================== GEMINI ====================
 try:
-    from cerebro_multi_ia import cerebro_multi
+    from cerebro_gemini_pro import CerebroGeminiPro
 except ImportError:
-    cerebro_multi = None
-    logger.warning("cerebro_multi_ia no encontrado")
+    CerebroGeminiPro = None
 
-# ==================== FUNCIONES AUXILIARES ====================
+# ==================== FUNCIONES ====================
+def get_gemini_api_key():
+    try:
+        if hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
+            return st.secrets['GEMINI_API_KEY']
+    except:
+        pass
+    try:
+        with open('.env', 'r') as f:
+            for linea in f:
+                if 'GEMINI_API_KEY' in linea:
+                    return linea.split('=')[1].strip().strip('"').strip("'")
+    except:
+        pass
+    return ""
+
 def inicializar_bd_ufc():
     os.makedirs("data", exist_ok=True)
     try:
@@ -76,48 +89,6 @@ def inicializar_bd_ufc():
     except Exception as e:
         logger.error(f"Error BD UFC: {e}")
 
-def mostrar_analisis_ia(resultado_ia):
-    """Muestra el análisis de la IA con estilo neon"""
-    if not resultado_ia:
-        return
-    
-    st.markdown("""
-        <style>
-        .ia-card {
-            background: rgba(0, 255, 255, 0.05);
-            border-left: 3px solid #00f2ff;
-            border-radius: 8px;
-            padding: 12px;
-            margin: 10px 0;
-        }
-        .ia-header {
-            color: #00f2ff;
-            font-size: 0.7em;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .ia-content {
-            color: #e0e0e0;
-            font-size: 0.9em;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    if resultado_ia.get('consenso'):
-        st.markdown(f"""
-            <div class="ia-card">
-                <div class="ia-header">🤖 MULTI-IA CONSENSUS</div>
-                <div class="ia-content">{resultado_ia['consenso']}</div>
-            </div>
-        """, unsafe_allow_html=True)
-    elif resultado_ia.get('gemini_prediccion'):
-        st.markdown(f"""
-            <div class="ia-card">
-                <div class="ia-header">🤖 GEMINI ANALYSIS</div>
-                <div class="ia-content">{resultado_ia['gemini_prediccion']}</div>
-            </div>
-        """, unsafe_allow_html=True)
-
 def main():
     if 'init' not in st.session_state:
         inicializar_bd_ufc()
@@ -141,6 +112,14 @@ def main():
             'futbol': analizar_futbol_pro_v20
         }
         
+        gemini_key = get_gemini_api_key()
+        if gemini_key and CerebroGeminiPro:
+            st.session_state.gemini = CerebroGeminiPro(gemini_key)
+            st.success("✅ Gemini conectado")
+        else:
+            st.session_state.gemini = None
+            st.warning("⚠️ Gemini no disponible")
+        
         st.session_state.nba_partidos = []
         st.session_state.ufc_combates = []
         st.session_state.futbol_partidos = {}
@@ -153,6 +132,7 @@ def main():
         st.session_state.tracker.render_sidebar_tracker()
         st.markdown("---")
         
+        # NBA
         if st.button("🏀 CARGAR NBA", use_container_width=True):
             with st.spinner("Cargando NBA..."):
                 st.session_state.nba_partidos = st.session_state.scrapers['nba'].get_games()
@@ -160,7 +140,9 @@ def main():
                     st.success(f"✅ {len(st.session_state.nba_partidos)} partidos")
                 else:
                     st.warning("⚠️ No hay partidos NBA hoy")
+            # Limpiar spinner automáticamente al salir del with
 
+        # MLB
         if st.button("⚾ CARGAR MLB", use_container_width=True):
             with st.spinner("Cargando MLB..."):
                 st.session_state.mlb_partidos = st.session_state.scrapers['mlb'].get_games()
@@ -169,8 +151,9 @@ def main():
                 else:
                     st.warning("⚠️ No hay partidos MLB hoy")
 
+        # UFC
         if st.button("🥊 CARGAR UFC", use_container_width=True):
-            with st.spinner("🔄 Buscando cartelera UFC (100% dinámico)..."):
+            with st.spinner("🔄 Buscando cartelera UFC..."):
                 ufc_scraper = st.session_state.scrapers['ufc']
                 st.session_state.ufc_combates = ufc_scraper.get_events()
                 if st.session_state.ufc_combates:
@@ -182,7 +165,7 @@ def main():
         st.subheader("⚽ FÚTBOL")
         
         # Obtener ligas dinámicamente
-        with st.spinner("Cargando ligas disponibles..."):
+        with st.spinner("Cargando ligas..."):
             futbol_scraper = st.session_state.scrapers['futbol']
             ligas = futbol_scraper.get_available_leagues()
         
@@ -226,12 +209,10 @@ def main():
                         try:
                             resultado = st.session_state.motores['nba'](p)
                             render_analisis_card(resultado)
-                            
-                            # Análisis con Multi-IA
-                            if cerebro_multi:
-                                analisis_ia = cerebro_multi.orquestrar_analisis("NBA", p, resultado)
-                                mostrar_analisis_ia(analisis_ia)
-                            
+                            if st.session_state.gemini:
+                                gemini_resp = st.session_state.gemini.orquestrar_decision_final("NBA", p, resultado)
+                                st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                                st.info(gemini_resp)
                         except Exception as e:
                             st.error(f"Error en análisis NBA: {e}")
                 st.markdown("---")
@@ -242,22 +223,48 @@ def main():
     with tab2:
         if st.session_state.ufc_combates:
             for idx, c in enumerate(st.session_state.ufc_combates):
-                p1 = c.get('peleador1', {}).get('nombre', '')
-                p2 = c.get('peleador2', {}).get('nombre', '')
-                partido_visual = {'peleador1': p1, 'peleador2': p2}
+                # Manejar diferentes formatos de datos
+                if isinstance(c, dict):
+                    p1 = c.get('peleador1', {})
+                    p2 = c.get('peleador2', {})
+                    
+                    if isinstance(p1, str):
+                        p1_nombre = p1
+                        p1_dict = {'nombre': p1_nombre}
+                    else:
+                        p1_nombre = p1.get('nombre', '')
+                        p1_dict = p1
+                    
+                    if isinstance(p2, str):
+                        p2_nombre = p2
+                        p2_dict = {'nombre': p2_nombre}
+                    else:
+                        p2_nombre = p2.get('nombre', '')
+                        p2_dict = p2
+                else:
+                    p1_nombre = ''
+                    p2_nombre = ''
+                    p1_dict = {'nombre': ''}
+                    p2_dict = {'nombre': ''}
+                
+                partido_visual = {
+                    'peleador1': p1_dict,
+                    'peleador2': p2_dict
+                }
                 
                 accion = st.session_state.visual_ufc.render(partido_visual, idx, st.session_state.tracker, None)
                 if accion == "analizar":
                     with st.spinner("🥊 Analizando UFC..."):
                         try:
-                            resultado = st.session_state.motores['ufc']({"peleador1": p1, "peleador2": p2})
+                            resultado = st.session_state.motores['ufc']({
+                                "peleador1": p1_nombre,
+                                "peleador2": p2_nombre
+                            })
                             render_analisis_card(resultado)
-                            
-                            # Análisis con Multi-IA
-                            if cerebro_multi:
-                                analisis_ia = cerebro_multi.orquestrar_analisis("UFC", partido_visual, resultado)
-                                mostrar_analisis_ia(analisis_ia)
-                            
+                            if st.session_state.gemini:
+                                gemini_resp = st.session_state.gemini.orquestrar_decision_final("UFC", partido_visual, resultado)
+                                st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                                st.info(gemini_resp)
                         except Exception as e:
                             st.error(f"Error en análisis UFC: {e}")
                 st.markdown("---")
@@ -277,12 +284,10 @@ def main():
                                 try:
                                     resultado = st.session_state.motores['futbol'](p)
                                     render_analisis_card(resultado)
-                                    
-                                    # Análisis con Multi-IA
-                                    if cerebro_multi:
-                                        analisis_ia = cerebro_multi.orquestrar_analisis("FÚTBOL", p, resultado)
-                                        mostrar_analisis_ia(analisis_ia)
-                                    
+                                    if st.session_state.gemini:
+                                        gemini_resp = st.session_state.gemini.orquestrar_decision_final("FÚTBOL", p, resultado)
+                                        st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                                        st.info(gemini_resp)
                                 except Exception as e:
                                     st.error(f"Error en análisis Fútbol: {e}")
                         st.markdown("---")
@@ -299,12 +304,10 @@ def main():
                         try:
                             resultado = st.session_state.motores['mlb'](p)
                             render_analisis_card(resultado)
-                            
-                            # Análisis con Multi-IA
-                            if cerebro_multi:
-                                analisis_ia = cerebro_multi.orquestrar_analisis("MLB", p, resultado)
-                                mostrar_analisis_ia(analisis_ia)
-                            
+                            if st.session_state.gemini:
+                                gemini_resp = st.session_state.gemini.orquestrar_decision_final("MLB", p, resultado)
+                                st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                                st.info(gemini_resp)
                         except Exception as e:
                             st.error(f"Error en análisis MLB: {e}")
                 st.markdown("---")
