@@ -1,32 +1,48 @@
 # -*- coding: utf-8 -*-
 """
-MOTOR FÚTBOL PRO - Con datos de prueba
+MOTOR FÚTBOL PRO - Con fuerza base por equipo
 """
 
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
+
+# Fuerza base de equipos de fútbol (0-100)
+EQUIPOS_FUERZA_FUTBOL = {
+    "Real Madrid": 95, "Barcelona": 93, "Manchester City": 94, "Liverpool": 92,
+    "Bayern": 91, "PSG": 90, "Arsenal": 88, "Chelsea": 86, "Inter": 85,
+    "AC Milan": 84, "Juventus": 83, "Atletico": 82, "Dortmund": 81, "Napoli": 80,
+    "Roma": 78, "Lazio": 77, "Sevilla": 76, "Villarreal": 75, "Real Sociedad": 74,
+    "Athletic": 73, "Valencia": 72, "Betis": 71
+}
+
+def obtener_fuerza_equipo(equipo):
+    """Obtiene fuerza base del equipo de fútbol"""
+    for nombre, fuerza in EQUIPOS_FUERZA_FUTBOL.items():
+        if nombre.lower() in equipo.lower() or equipo.lower() in nombre.lower():
+            return fuerza
+    return 70
+
 
 def analizar_futbol_pro_v20(partido_data):
-    """Analiza partido de fútbol con datos de prueba"""
+    """Analiza partido de fútbol con fuerza de equipos"""
     local = partido_data.get('home', partido_data.get('local', 'Local'))
     visitante = partido_data.get('away', partido_data.get('visitante', 'Visitante'))
     
-    # Datos de prueba basados en fuerza percibida
-    equipos_fuertes = ["Real Madrid", "Barcelona", "Manchester City", "Liverpool", "Bayern", "PSG"]
-    equipos_debiles = ["Getafe", "Elche", "Cadiz", "Almeria"]
+    fuerza_local = obtener_fuerza_equipo(local)
+    fuerza_visit = obtener_fuerza_equipo(visitante)
     
-    factor_local = 1.3 if local in equipos_fuertes else (0.7 if local in equipos_debiles else 1.0)
-    factor_visit = 1.3 if visitante in equipos_fuertes else (0.7 if visitante in equipos_debiles else 1.0)
-    
-    base_local = 1.8
-    base_visit = 1.5
-    
-    expected_local = base_local * factor_local
-    expected_visit = base_visit * factor_visit
+    # Goles esperados
+    base_goles = 1.5
+    expected_local = base_goles + (fuerza_local - 70) * 0.025
+    expected_visit = base_goles + (fuerza_visit - 70) * 0.025
     total_proyectado = expected_local + expected_visit
     
-    prob_over_25 = 1 / (1 + np.exp(-(total_proyectado - 2.5) / 1.5))
-    prob_btts = 0.5 + (expected_local * expected_visit / 6) * 0.3
-    prob_local_win = 0.45 + (factor_local - factor_visit) * 0.15
+    # Probabilidades
+    prob_over_25 = 1 / (1 + np.exp(-(total_proyectado - 2.5) / 1.2))
+    prob_btts = 0.45 + (expected_local * expected_visit / 5) * 0.4
+    prob_local_win = 0.45 + (fuerza_local - fuerza_visit) / 150
     
     prob_over_25 = min(0.85, max(0.15, prob_over_25))
     prob_btts = min(0.85, max(0.15, prob_btts))
@@ -49,6 +65,8 @@ def analizar_futbol_pro_v20(partido_data):
         confianza = 50
         probabilidad = 0.5
     
+    confianza = min(85, max(40, confianza))
+    
     return {
         'recomendacion': recomendacion,
         'confianza': confianza,
@@ -58,5 +76,6 @@ def analizar_futbol_pro_v20(partido_data):
         'proyeccion_visitante': round(expected_visit, 1),
         'prob_over_25': round(prob_over_25 * 100, 1),
         'prob_btts': round(prob_btts * 100, 1),
-        'etiqueta_verde': confianza >= 70
+        'etiqueta_verde': confianza >= 70,
+        'edge': round((probabilidad - 0.5) * 100, 1)
     }
