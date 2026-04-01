@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-MAIN VISION COMPLETO - NEON V20 (Versión Unificada)
-Funciona igual en local y Streamlit Cloud con datos dinámicos
+MAIN VISION COMPLETO - NEON V20 (Versión Final)
+NBA, MLB, UFC, Fútbol con Gemini automático
 """
 
 import streamlit as st
@@ -43,14 +43,12 @@ except ImportError:
 # ==================== FUNCIONES AUXILIARES ====================
 def get_gemini_api_key():
     """Obtiene API key desde secrets, .env, o variable de entorno"""
-    # Streamlit Cloud secrets
     try:
         if hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
             return st.secrets['GEMINI_API_KEY']
     except:
         pass
     
-    # Archivo .env local
     try:
         with open('.env', 'r') as f:
             for linea in f:
@@ -59,7 +57,6 @@ def get_gemini_api_key():
     except:
         pass
     
-    # Variable de entorno
     import os
     return os.environ.get('GEMINI_API_KEY', '')
 
@@ -214,7 +211,7 @@ def main():
             'futbol': analizar_futbol_pro_v20
         }
         
-        # Gemini
+        # Gemini - con detección automática de modelo
         gemini_key = get_gemini_api_key()
         if gemini_key and CerebroGeminiPro:
             st.session_state.gemini = CerebroGeminiPro(gemini_key)
@@ -233,8 +230,8 @@ def main():
         st.session_state.tracker.render_sidebar_tracker()
         st.markdown("---")
         
-        # 🔧 DIAGNÓSTICO GEMINI (AQUÍ DENTRO DEL SIDEBAR)
-        with st.expander("🔧 Diagnóstico Gemini"):
+        # 🔧 Diagnóstico Gemini - OCULTO POR DEFECTO
+        with st.expander("🔧 Diagnóstico Gemini", expanded=False):
             key = get_gemini_api_key()
             if key:
                 st.success(f"✅ API key cargada")
@@ -242,6 +239,8 @@ def main():
                 st.caption(f"Longitud: {len(key)} caracteres")
                 if st.session_state.gemini:
                     st.success("✅ Gemini inicializado correctamente")
+                    if hasattr(st.session_state.gemini, 'model_name') and st.session_state.gemini.model_name:
+                        st.caption(f"📌 Modelo: {st.session_state.gemini.model_name}")
                 else:
                     st.error("❌ Gemini NO inicializado")
             else:
@@ -251,7 +250,7 @@ def main():
                 try:
                     st.caption(f"Secrets disponibles: {list(st.secrets.keys()) if st.secrets else 'Ninguno'}")
                 except:
-                    st.caption("No se pudieron leer secrets")
+                    pass
         
         st.markdown("---")
         
