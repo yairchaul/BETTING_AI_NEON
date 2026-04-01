@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-ESPN UFC - Scraper que usa API interna de ESPN (más estable que scraping)
+ESPN UFC - Módulo unificado con Selenium (local) y API fallback (Cloud)
+Funciona en local con Selenium, en Cloud con API de ESPN
 """
 
-import requests
 import json
 import sqlite3
 import logging
@@ -14,12 +14,22 @@ logger = logging.getLogger(__name__)
 class ESPN_UFC:
     def __init__(self):
         self.db_path = 'data/betting_stats.db'
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            'Accept': 'application/json, text/plain, */*',
-        }
         self._crear_tablas()
-
+        self._selenium_disponible = self._verificar_selenium()
+    
+    def _verificar_selenium(self):
+        """Verifica si Selenium está disponible (solo en local)"""
+        try:
+            import selenium
+            # Intentar importar webdriver_manager
+            try:
+                from webdriver_manager.chrome import ChromeDriverManager
+                return True
+            except:
+                return False
+        except ImportError:
+            return False
+    
     def _crear_tablas(self):
         """Crea las tablas necesarias"""
         try:
@@ -56,112 +66,120 @@ class ESPN_UFC:
             logger.error(f"Error creando tablas: {e}")
 
     def get_events(self):
-        """Obtiene la cartelera desde la API de ESPN"""
-        logger.info("🔍 Obteniendo cartelera UFC desde API ESPN...")
+        """Obtiene la cartelera - Selenium en local, API en Cloud"""
+        logger.info("🔍 Obteniendo cartelera UFC...")
         
-        # API de ESPN para MMA
-        api_url = "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"
+        # Intento 1: Selenium (solo si está disponible)
+        if self._selenium_disponible:
+            combates = self._scrapear_con_selenium()
+            if combates:
+                logger.info(f"✅ Cartelera obtenida con Selenium: {len(combates)} combates")
+                self._guardar_en_bd(combates)
+                return combates
         
+        # Intento 2: API de ESPN (funciona en Cloud)
+        combates = self._scrapear_con_api()
+        if combates:
+            logger.info(f"✅ Cartelera obtenida con API: {len(combates)} combates")
+            self._guardar_en_bd(combates)
+            return combates
+        
+        # Intento 3: BD como fallback
+        logger.info("📀 Recuperando última cartelera guardada...")
+        return self._obtener_ultima_cartelera_bd()
+
+    def _scrapear_con_selenium(self):
+        """Usa Selenium para extraer odds (funciona en local)"""
         try:
-            response = requests.get(api_url, headers=self.headers, timeout=15)
+            from selenium import webdriver
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            from webdriver_manager.chrome import ChromeDriverManager
+            from selenium.webdriver.chrome.service import Service
+            
+            options = Options()
+            options.add_argument("--headless")
+            options.add_argument("--no-sandbox")
+            options.add_argument("--disable-dev-shm-usage")
+            options.add_argument("--window-size=1920,1080")
+            
+            service = Service(ChromeDriverManager().install())
+            driver = webdriver.Chrome(service=service, options=options)
+            
+            # Buscar evento activo
+            url = "https://www.espn.com.mx/mma/fightcenter/_/id/600058693/liga/ufc"
+            driver.get(url)
+            
+            wait = WebDriverWait(driver, 15)
+            wait.until(EC.presence_of_element_located((By.CLASS_NAME, "FightCard")))
+            
+            combates = []
+            fight_cards = driver.find_elements(By.CLASS_NAME, "FightCard")
+            
+            for card in fight_cards[:15]:
+                try:
+                    fighters = card.find_elements(By.CSS_SELECTOR, ".fighter-name")
+                    if len(fighters) >= 2:
+                        p1 = fighters[0].text.strip()
+                        p2 = fighters[1].text.strip()
+                        
+                        # Extraer odds
+                        odds_elements = card.find_elements(By.CSS_SELECTOR, ".odds")
+                        odds1 = odds_elements[0].text.strip() if len(odds_elements) > 0 else "N/A"
+                        odds2 = odds_elements[1].text.strip() if len(odds_elements) > 1 else "N/A"
+                        
+                        combates.append({
+                            'peleador1': {'nombre': p1},
+                            'peleador2': {'nombre': p2},
+                            'categoria': 'Peso Pactado',
+                            'odds': {'moneyline_local': odds1, 'moneyline_visitante': odds2},
+                            'fecha_evento': datetime.now().strftime("%Y-%m-%d")
+                        })
+                except:
+                    continue
+            
+            driver.quit()
+            return combates
+            
+        except Exception as e:
+            logger.error(f"Error en Selenium: {e}")
+            return []
+
+    def _scrapear_con_api(self):
+        """Usa API de ESPN (funciona en Cloud)"""
+        try:
+            import requests
+            api_url = "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"
+            response = requests.get(api_url, timeout=15)
             
             if response.status_code == 200:
                 data = response.json()
                 combates = []
                 
-                events = data.get('events', [])
-                for event in events:
+                for event in data.get('events', []):
                     nombre_evento = event.get('name', 'UFC Event')
-                    fecha_evento = event.get('date', '')
-                    if fecha_evento:
-                        fecha_evento = fecha_evento[:10]
+                    fecha_evento = event.get('date', '')[:10]
                     
-                    competitions = event.get('competitions', [])
-                    for comp in competitions:
+                    for comp in event.get('competitions', []):
                         competitors = comp.get('competitors', [])
                         if len(competitors) >= 2:
-                            # Extraer nombres
-                            p1_data = competitors[0].get('athlete', {})
-                            p2_data = competitors[1].get('athlete', {})
+                            p1 = competitors[0].get('athlete', {}).get('displayName', '')
+                            p2 = competitors[1].get('athlete', {}).get('displayName', '')
                             
-                            p1_nombre = p1_data.get('displayName', '')
-                            p2_nombre = p2_data.get('displayName', '')
-                            
-                            # Extraer récords si están disponibles
-                            p1_record = p1_data.get('record', {}).get('displayValue', 'N/A')
-                            p2_record = p2_data.get('record', {}).get('displayValue', 'N/A')
-                            
-                            if p1_nombre and p2_nombre:
+                            if p1 and p2:
                                 combates.append({
-                                    'peleador1': {
-                                        'nombre': p1_nombre,
-                                        'record': p1_record
-                                    },
-                                    'peleador2': {
-                                        'nombre': p2_nombre,
-                                        'record': p2_record
-                                    },
+                                    'peleador1': {'nombre': p1},
+                                    'peleador2': {'nombre': p2},
                                     'categoria': comp.get('group', {}).get('name', 'Peso Pactado'),
                                     'evento': nombre_evento,
                                     'fecha_evento': fecha_evento
                                 })
-                
-                if combates:
-                    logger.info(f"✅ {len(combates)} combates obtenidos de API ESPN")
-                    self._guardar_en_bd(combates)
-                    return combates
-                else:
-                    logger.warning("No se encontraron combates en la API")
-            else:
-                logger.warning(f"Error en API: {response.status_code}")
-                
+                return combates
         except Exception as e:
-            logger.error(f"Error en API ESPN: {e}")
-        
-        # Fallback: intentar con la página web
-        logger.info("🔄 Intentando scraping web como fallback...")
-        combates = self._scrapear_web_fallback()
-        if combates:
-            self._guardar_en_bd(combates)
-            return combates
-        
-        # Último recurso: cartelera de BD
-        logger.info("📀 Recuperando última cartelera guardada...")
-        return self._obtener_ultima_cartelera_bd()
-
-    def _scrapear_web_fallback(self):
-        """Scraping web como fallback"""
-        try:
-            from bs4 import BeautifulSoup
-            url = "https://www.espn.com/mma/schedule"
-            response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            combates = []
-            filas = soup.select('.Table__TR')
-            
-            for fila in filas[:15]:
-                texto = fila.get_text()
-                if 'vs' in texto.lower():
-                    partes = texto.lower().split('vs')
-                    if len(partes) >= 2:
-                        p1 = partes[0].strip()
-                        p2 = partes[1].strip()
-                        # Limpiar nombres
-                        p1 = p1.split('\n')[-1].strip()
-                        p2 = p2.split('\n')[0].strip()
-                        if p1 and p2 and len(p1) > 2 and len(p2) > 2:
-                            combates.append({
-                                'peleador1': {'nombre': p1},
-                                'peleador2': {'nombre': p2},
-                                'categoria': 'Peso Pactado',
-                                'evento': 'UFC Fight Night',
-                                'fecha_evento': None
-                            })
-            return combates
-        except Exception as e:
-            logger.error(f"Error en fallback web: {e}")
-            return []
+            logger.error(f"Error en API: {e}")
+        return []
 
     def _obtener_ultima_cartelera_bd(self):
         """Recupera la última cartelera guardada"""
@@ -186,7 +204,7 @@ class ESPN_UFC:
             cursor.execute('''
                 INSERT INTO eventos_ufc (nombre, fecha, cartelera, ultima_actualizacion)
                 VALUES (?, ?, ?, ?)
-            ''', ("UFC API", datetime.now().strftime("%Y-%m-%d"), json.dumps(combates), datetime.now().isoformat()))
+            ''', ("UFC", datetime.now().strftime("%Y-%m-%d"), json.dumps(combates), datetime.now().isoformat()))
             conn.commit()
         except Exception as e:
             logger.error(f"Error guardando: {e}")
