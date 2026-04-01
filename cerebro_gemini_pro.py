@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-CEREBRO GEMINI PRO - Decisor Final Inteligente
-Versión con detección automática del modelo disponible
+CEREBRO GEMINI PRO - Versión Universal Adaptativa
+Detecta automáticamente el modelo disponible en tu API key
 """
 
 import os
@@ -16,10 +16,12 @@ logger = logging.getLogger(__name__)
 class CerebroGeminiPro:
     def __init__(self, api_key=None):
         """
-        Inicializa Gemini con la API key desde múltiples fuentes
-        Detecta automáticamente el mejor modelo disponible
+        Inicializa Gemini detectando automáticamente el mejor modelo disponible
         """
         self.api_key = None
+        self.model = None
+        self.model_name = None
+        self.ultimo_error = None
         
         # 1. Intentar con la API key pasada como argumento
         if api_key:
@@ -58,34 +60,47 @@ class CerebroGeminiPro:
         # Verificar si tenemos API key
         if not self.api_key:
             logger.error("❌ No se encontró API key de Gemini")
-            self.model = None
-            self.model_name = None
             return
         
-        # Configurar Gemini con detección automática de modelo
+        # Configurar Gemini con detección automática
         try:
             genai.configure(api_key=self.api_key)
             
-            # Listar modelos disponibles
+            # Detección automática de modelos disponibles
             modelos_disponibles = []
             try:
                 for m in genai.list_models():
-                    if 'gemini' in m.name and 'generateContent' in m.supported_generation_methods:
+                    if 'generateContent' in m.supported_generation_methods:
                         modelos_disponibles.append(m.name)
                 logger.info(f"Modelos Gemini disponibles: {modelos_disponibles}")
             except Exception as e:
                 logger.warning(f"Error listando modelos: {e}")
                 modelos_disponibles = []
             
-            # Seleccionar el mejor modelo disponible
-            self.model_name = self._seleccionar_mejor_modelo(modelos_disponibles)
+            # Prioridad de selección (busca la versión más potente primero)
+            prioridad = [
+                'models/gemini-2.0-flash-exp',
+                'models/gemini-2.0-flash',
+                'models/gemini-1.5-pro',
+                'models/gemini-1.5-flash',
+                'models/gemini-pro',
+                'models/gemini-1.0-pro'
+            ]
+            
+            for p in prioridad:
+                if p in modelos_disponibles:
+                    self.model_name = p
+                    break
+            
+            # Si no encontró ningún modelo prioritario, tomar el primero disponible
+            if not self.model_name and modelos_disponibles:
+                self.model_name = modelos_disponibles[0]
             
             if not self.model_name:
                 logger.error("❌ No se encontró ningún modelo Gemini disponible")
-                self.model = None
                 return
             
-            # Configurar generación
+            # Configurar el modelo
             generation_config = {
                 "temperature": 0.3,
                 "max_output_tokens": 300,
@@ -98,37 +113,24 @@ class CerebroGeminiPro:
             )
             logger.info(f"✅ Gemini conectado exitosamente con modelo: {self.model_name}")
             
+            # Prueba rápida de conexión
+            try:
+                test_response = self.model.generate_content("Responde solo con la palabra: OK")
+                logger.info(f"Prueba de conexión exitosa: {test_response.text}")
+            except Exception as e:
+                self.ultimo_error = f"Prueba falló: {e}"
+                logger.warning(f"Prueba de conexión falló: {e}")
+            
         except Exception as e:
             logger.error(f"❌ Error conectando Gemini: {e}")
-            self.model = None
-            self.model_name = None
-
-    def _seleccionar_mejor_modelo(self, modelos_disponibles):
-        """Selecciona el mejor modelo disponible en orden de preferencia"""
-        # Orden de preferencia (del mejor al menos preferido)
-        preferidos = [
-            'gemini-2.0-flash-exp',
-            'gemini-2.0-flash',
-            'gemini-1.5-pro',
-            'gemini-1.5-flash',
-            'gemini-pro',
-            'gemini-1.0-pro'
-        ]
-        
-        for preferido in preferidos:
-            for disponible in modelos_disponibles:
-                if preferido in disponible:
-                    return disponible
-        
-        # Si no encuentra ninguno de los preferidos, tomar el primero disponible
-        return modelos_disponibles[0] if modelos_disponibles else None
+            self.ultimo_error = str(e)
 
     def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis: Dict) -> str:
         """
         Decisor final inteligente con análisis de valor real
         """
         if not self.model:
-            return self._fallback_response(analisis, "Gemini no disponible")
+            return self._fallback_response(analisis, f"Gemini no disponible. Último error: {self.ultimo_error or 'Desconocido'}")
         
         try:
             # Extraer nombres según deporte
@@ -159,7 +161,7 @@ class CerebroGeminiPro:
             
         except Exception as e:
             logger.error(f"Error en Gemini: {e}")
-            return self._fallback_response(analisis, f"Error técnico")
+            return self._fallback_response(analisis, f"Error: {str(e)[:50]}")
 
     def _extraer_nombre_local(self, deporte: str, partido: Dict) -> str:
         """Extrae el nombre del equipo/peleador local"""
@@ -182,20 +184,20 @@ class CerebroGeminiPro:
     def _crear_prompt(self, deporte, local, visitante, recomendacion, confianza, total, edge, probabilidad):
         """Crea el prompt optimizado para Gemini"""
         return f"""
-Eres un analista profesional de apuestas deportivas con 15 años de experiencia.
+Eres un experto en trading deportivo y análisis de apuestas.
 
 **Deporte:** {deporte.upper()}
-**Partido:** {local} vs {visitante}
+**Encuentro:** {local} vs {visitante}
 
-**Análisis del Motor:**
+**Análisis Estadístico del Motor:**
 - Recomendación: {recomendacion}
-- Confianza matemática: {confianza}%
+- Confianza: {confianza}%
 - Probabilidad: {probabilidad}%
 - Total proyectado: {total}
 - Edge: {edge:.1f}%
 
 **Instrucciones:**
-- Analiza si la recomendación tiene valor real
+- Valida si la apuesta tiene valor real
 - Sé honesto: si no hay valor claro, di "NO RECOMENDAR"
 - Responde SOLO con este formato exacto (sin texto adicional):
 
