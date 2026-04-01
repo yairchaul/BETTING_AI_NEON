@@ -70,7 +70,6 @@ def inicializar_bd_ufc():
         conn = sqlite3.connect("data/betting_stats.db")
         cursor = conn.cursor()
         
-        # Tabla eventos UFC
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS eventos_ufc (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -82,7 +81,6 @@ def inicializar_bd_ufc():
             )
         ''')
         
-        # Tabla peleadores UFC
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS peleadores_ufc (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -99,7 +97,6 @@ def inicializar_bd_ufc():
             )
         ''')
         
-        # Insertar datos base si tabla vacía
         cursor.execute("SELECT COUNT(*) FROM peleadores_ufc")
         if cursor.fetchone()[0] == 0:
             peleadores = [
@@ -159,7 +156,6 @@ def obtener_datos_peleador(nombre):
         return None
 
 def mostrar_player_props_nba(analisis):
-    """Muestra los player props de NBA"""
     col1, col2 = st.columns(2)
     with col1:
         top3 = analisis.get('top_3pm_local')
@@ -173,7 +169,6 @@ def mostrar_player_props_nba(analisis):
             st.caption(f"🎯 {top3.get('triples_por_partido', 0)} triples/partido")
 
 def mostrar_player_props_mlb(analisis):
-    """Muestra los player props de MLB"""
     col1, col2 = st.columns(2)
     with col1:
         hr = analisis.get('top_hr_local')
@@ -223,10 +218,8 @@ def main():
         gemini_key = get_gemini_api_key()
         if gemini_key and CerebroGeminiPro:
             st.session_state.gemini = CerebroGeminiPro(gemini_key)
-            st.success("✅ Gemini conectado")
         else:
             st.session_state.gemini = None
-            st.warning("⚠️ Gemini no disponible - Revisa API key")
         
         st.session_state.nba_partidos = []
         st.session_state.ufc_combates = []
@@ -238,6 +231,28 @@ def main():
     with st.sidebar:
         st.header("⚙️ CONTROLES")
         st.session_state.tracker.render_sidebar_tracker()
+        st.markdown("---")
+        
+        # 🔧 DIAGNÓSTICO GEMINI (AQUÍ DENTRO DEL SIDEBAR)
+        with st.expander("🔧 Diagnóstico Gemini"):
+            key = get_gemini_api_key()
+            if key:
+                st.success(f"✅ API key cargada")
+                st.caption(f"Primeros 10: {key[:10]}... | Últimos 4: ...{key[-4:]}")
+                st.caption(f"Longitud: {len(key)} caracteres")
+                if st.session_state.gemini:
+                    st.success("✅ Gemini inicializado correctamente")
+                else:
+                    st.error("❌ Gemini NO inicializado")
+            else:
+                st.error("❌ API key NO cargada")
+            
+            if hasattr(st, 'secrets'):
+                try:
+                    st.caption(f"Secrets disponibles: {list(st.secrets.keys()) if st.secrets else 'Ninguno'}")
+                except:
+                    st.caption("No se pudieron leer secrets")
+        
         st.markdown("---")
         
         # NBA
@@ -271,7 +286,6 @@ def main():
         st.markdown("---")
         st.subheader("⚽ FÚTBOL")
         
-        # Obtener ligas dinámicamente
         with st.spinner("Cargando ligas..."):
             futbol_scraper = st.session_state.scrapers['futbol']
             ligas = futbol_scraper.get_available_leagues()
@@ -306,7 +320,7 @@ def main():
     # ==================== TABS ====================
     tab1, tab2, tab3, tab4 = st.tabs(["🏀 NBA", "🥊 UFC", "⚽ FÚTBOL", "⚾ MLB"])
 
-    # ==================== NBA TAB ====================
+    # NBA TAB
     with tab1:
         if st.session_state.nba_partidos:
             for idx, p in enumerate(st.session_state.nba_partidos):
@@ -329,11 +343,10 @@ def main():
         else:
             st.info("👈 Carga NBA en el sidebar")
 
-    # ==================== UFC TAB ====================
+    # UFC TAB
     with tab2:
         if st.session_state.ufc_combates:
             for idx, c in enumerate(st.session_state.ufc_combates):
-                # Manejar diferentes formatos de datos
                 if isinstance(c, dict):
                     p1_raw = c.get('peleador1', {})
                     p2_raw = c.get('peleador2', {})
@@ -357,7 +370,6 @@ def main():
                     p1_dict = {'nombre': ''}
                     p2_dict = {'nombre': ''}
                 
-                # Enriquecer con datos de BD
                 datos_p1 = obtener_datos_peleador(p1_nombre)
                 datos_p2 = obtener_datos_peleador(p2_nombre)
                 
@@ -390,7 +402,7 @@ def main():
         else:
             st.info("👈 Carga UFC en el sidebar")
 
-    # ==================== FÚTBOL TAB ====================
+    # FÚTBOL TAB
     with tab3:
         if st.session_state.futbol_partidos:
             for liga, partidos in st.session_state.futbol_partidos.items():
@@ -413,7 +425,7 @@ def main():
         else:
             st.info("👈 Carga ligas en el sidebar")
 
-    # ==================== MLB TAB ====================
+    # MLB TAB
     with tab4:
         if st.session_state.mlb_partidos:
             for idx, p in enumerate(st.session_state.mlb_partidos):
@@ -436,7 +448,7 @@ def main():
         else:
             st.info("👈 Carga MLB en el sidebar")
 
-    # ==================== PROFIT CARD ====================
+    # PROFIT CARD
     try:
         if os.path.exists("data/bitacora_maestra.csv"):
             df = pd.read_csv("data/bitacora_maestra.csv")
@@ -455,17 +467,6 @@ def main():
                     """, unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Error en profit card: {e}")
-        # En la barra lateral, después de los botones de carga
-with st.sidebar.expander("🔧 Diagnóstico Gemini"):
-    key = get_gemini_api_key()
-    if key:
-        st.success(f"✅ API key cargada (primeros {len(key[:10])}...{key[-4:]})")
-        st.caption(f"Longitud: {len(key)} caracteres")
-    else:
-        st.error("❌ API key NO cargada")
-    
-    if hasattr(st, 'secrets'):
-        st.caption(f"Secrets disponibles: {list(st.secrets.keys()) if st.secrets else 'Ninguno'}")
 
 if __name__ == "__main__":
     main()
