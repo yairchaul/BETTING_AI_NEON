@@ -455,6 +455,17 @@ def main():
                     """, unsafe_allow_html=True)
     except Exception as e:
         logger.error(f"Error en profit card: {e}")
+        # En la barra lateral, después de los botones de carga
+with st.sidebar.expander("🔧 Diagnóstico Gemini"):
+    key = get_gemini_api_key()
+    if key:
+        st.success(f"✅ API key cargada (primeros {len(key[:10])}...{key[-4:]})")
+        st.caption(f"Longitud: {len(key)} caracteres")
+    else:
+        st.error("❌ API key NO cargada")
+    
+    if hasattr(st, 'secrets'):
+        st.caption(f"Secrets disponibles: {list(st.secrets.keys()) if st.secrets else 'Ninguno'}")
 
 if __name__ == "__main__":
     main()
