@@ -1,8 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-CEREBRO GEMINI PRO - Versión Adaptativa Anti-404
-Elimina errores de modelos obsoletos detectando disponibilidad real.
-"""
 import os
 import logging
 import streamlit as st
@@ -20,116 +16,110 @@ class CerebroGeminiPro:
         self.ultimo_error = None
         
         if not self.api_key:
-            logger.error("❌ No se encontró API key")
             return
 
-        self._conectar_gemini()
+        self._conectar_estable()
 
     def _cargar_key(self):
-        # Prioridad: st.secrets -> .env -> os.environ
         if hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
             return st.secrets['GEMINI_API_KEY']
         return os.environ.get('GEMINI_API_KEY', '')
 
-    def _conectar_gemini(self):
+    def _conectar_estable(self):
+        """Fuerza la conexión a modelos estables ignorando experimentales"""
         try:
             genai.configure(api_key=self.api_key)
             
-            # 1. Obtener modelos REALES disponibles en tu cuenta hoy
-            modelos_reales = []
+            # 1. Obtener todos los modelos que REALMENTE responden
+            modelos_disponibles = []
             try:
                 for m in genai.list_models():
                     if 'generateContent' in m.supported_generation_methods:
-                        modelos_reales.append(m.name)
-            except Exception as e:
-                logger.error(f"Error listando modelos: {e}")
-                modelos_reales = []
+                        modelos_disponibles.append(m.name)
+            except Exception:
+                modelos_disponibles = []
 
-            # 2. Filtrar modelos que no sean obsoletos (evitar -exp si es posible)
-            # Buscamos primero versiones estables de 1.5, luego flash, luego pro
-            prioridad_busqueda = ['1.5-flash', '1.5-pro', '2.0-flash', 'gemini-pro']
+            # 2. Lista de PRIORIDAD ESTABLE (Evitamos los que dicen 'exp' o '2.0' si dan problemas)
+            # El 1.5-flash es el más estable y rápido actualmente.
+            opciones = [
+                'models/gemini-1.5-flash', 
+                'models/gemini-1.5-pro',
+                'models/gemini-pro'
+            ]
             
-            seleccionado = None
-            for pref in prioridad_busqueda:
-                for real in modelos_reales:
-                    if pref in real and "-exp" not in real: # Preferir estables
-                        seleccionado = real
-                        break
-                if seleccionado: break
-            
-            # Si no hay estables, cualquier cosa que funcione
-            if not seleccionado and modelos_reales:
-                seleccionado = modelos_reales[0]
+            seleccion = None
+            for opt in opciones:
+                if opt in modelos_disponibles:
+                    # Intento de validación real (si falla el 404 aquí, saltamos al siguiente)
+                    try:
+                        temp_model = genai.GenerativeModel(opt)
+                        temp_model.generate_content("ping", generation_config={"max_output_tokens": 1})
+                        seleccion = opt
+                        break 
+                    except Exception:
+                        continue
 
-            if not seleccionado:
-                self.ultimo_error = "No hay modelos disponibles en esta API Key"
-                return
+            if not seleccion and modelos_disponibles:
+                # Si ninguno de los preferidos funcionó, agarramos el primero que no sea experimental
+                seleccion = next((m for m in modelos_disponibles if "-exp" not in m), modelos_disponibles[0])
 
-            self.model_name = seleccionado
-            self.model = genai.GenerativeModel(
-                model_name=self.model_name,
-                generation_config={"temperature": 0.3, "max_output_tokens": 350}
-            )
-            logger.info(f"✅ Conectado a modelo activo: {self.model_name}")
+            if seleccion:
+                self.model_name = seleccion
+                self.model = genai.GenerativeModel(
+                    model_name=self.model_name,
+                    generation_config={
+                        "temperature": 0.2, # Más bajo = más estable
+                        "max_output_tokens": 300,
+                        "top_p": 0.8
+                    }
+                )
+                logger.info(f"✅ Conectado a: {self.model_name}")
+            else:
+                self.ultimo_error = "No se hallaron modelos activos"
 
         except Exception as e:
             self.ultimo_error = str(e)
-            logger.error(f"❌ Error en conexión: {e}")
 
     def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis: Dict) -> str:
         if not self.model:
-            return self._fallback_response(analisis, f"IA Offline: {self.ultimo_error}")
+            return self._fallback_response(analisis, f"IA no lista: {self.ultimo_error}")
 
         try:
-            local = self._extraer_nombre(partido, 'local')
-            visitante = self._extraer_nombre(partido, 'visitante')
+            # Extraer nombres limpiamente
+            l = self._get_n(partido, 'l')
+            v = self._get_n(partido, 'v')
             
-            prompt = self._crear_prompt(
-                deporte, local, visitante, 
-                analisis.get('recomendacion', 'N/A'),
-                analisis.get('confianza', 50),
-                analisis.get('edge', 0)
-            )
+            prompt = f"""Analiza esta apuesta de {deporte}:
+Evento: {l} vs {v}
+Sugerencia: {analisis.get('recomendacion')}
+Confianza: {analisis.get('confianza')}%
+Edge: {analisis.get('edge')}%
 
-            response = self.model.generate_content(prompt)
-            texto = response.text.strip()
-
-            if "MEJOR APUESTA FINAL" in texto:
-                return texto
-            return self._fallback_response(analisis, "Respuesta con formato inválido")
-
-        except Exception as e:
-            # Si el error es un 404 (modelo caducado), intentamos reconectar una vez
-            if "404" in str(e) or "not found" in str(e).lower():
-                logger.warning("Modelo detectado como obsoleto. Intentando refrescar lista...")
-                self._conectar_gemini()
-            return self._fallback_response(analisis, f"Error Gemini: {str(e)[:40]}")
-
-    def _extraer_nombre(self, partido, tipo):
-        if tipo == 'local':
-            return partido.get('home', partido.get('local', partido.get('peleador1', {} if isinstance(partido.get('peleador1'), dict) else 'Local')))
-        return partido.get('away', partido.get('visitante', partido.get('peleador2', {} if isinstance(partido.get('peleador2'), dict) else 'Visitante')))
-
-    def _crear_prompt(self, deporte, local, vis, rec, conf, edge):
-        return f"""Analista Pro: {deporte}
-Evento: {local} vs {vis}
-Motor Estadístico: {rec} (Confianza: {conf}%, Edge: {edge}%)
-
-Instrucciones:
-1. Valida si hay valor real.
-2. Formato ESTRICTO:
+Responde con este formato:
 MEJOR APUESTA FINAL: [Apuesta]
 PROBABILIDAD ESTIMADA: [XX]%
-RAZÓN PRINCIPAL: [1 línea]
+RAZÓN PRINCIPAL: [Breve]
 RIESGO: [Bajo/Medio/Alto]
 CONFIANZA IA: [Alta/Media/Baja]"""
 
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+
+        except Exception as e:
+            # Si da 404 en plena ejecución, intentamos bajar al modelo más básico
+            if "404" in str(e):
+                self.model = genai.GenerativeModel('models/gemini-1.5-flash')
+            return self._fallback_response(analisis, f"Error Gemini: {str(e)[:30]}")
+
+    def _get_n(self, p, t):
+        if t == 'l':
+            res = p.get('home') or p.get('local') or p.get('peleador1', 'Local')
+        else:
+            res = p.get('away') or p.get('visitante') or p.get('peleador2', 'Visitante')
+        return res.get('nombre', res) if isinstance(res, dict) else res
+
     def _fallback_response(self, analisis, motivo):
-        return f"""MEJOR APUESTA FINAL: {analisis.get('recomendacion', 'N/A')}
-PROBABILIDAD ESTIMADA: {analisis.get('confianza', 50)}%
-RAZÓN PRINCIPAL: {motivo} (Motor Matemático)
-RIESGO: Medio
-CONFIANZA IA: N/A"""
+        return f"MEJOR APUESTA FINAL: {analisis.get('recomendacion')}\nPROBABILIDAD ESTIMADA: {analisis.get('confianza')}%\nRAZÓN PRINCIPAL: {motivo}\nRIESGO: Medio\nCONFIANZA IA: N/A"
 
 def get_gemini(api_key=None):
     return CerebroGeminiPro(api_key)
