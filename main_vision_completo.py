@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 MAIN VISION COMPLETO - NEON V20 (Versión Final Estable y Optimizada)
+NBA, UFC, Fútbol y MLB completamente funcionales
 """
 
 import streamlit as st
@@ -110,8 +111,10 @@ def inicializar_bd_ufc():
         cursor.execute("SELECT COUNT(*) FROM eventos_ufc")
         if cursor.fetchone()[0] == 0:
             cartelera_prueba = [
-                {"peleador1": "Israel Adesanya", "peleador2": "Joe Pyfer"},
+                {"peleador1": "Renato Moicano", "peleador2": "Grant Duncan"},
                 {"peleador1": "Bruna Brasil", "peleador2": "Alexia Thainara"},
+                {"peleador1": "Maycee Barber", "peleador2": "Alexa Grasso"},
+                {"peleador1": "Israel Adesanya", "peleador2": "Joe Pyfer"},
             ]
             cursor.execute('''
                 INSERT INTO eventos_ufc (nombre, fecha, cartelera, ultima_actualizacion)
@@ -214,12 +217,13 @@ def main():
                 else:
                     st.warning("⚠️ No hay partidos MLB hoy")
 
-if st.button("🥊 CARGAR UFC", use_container_width=True):
-    with st.spinner("Cargando cartelera UFC..."):
-        ufc_scraper = ESPN_UFC()
-        st.session_state.ufc_combates = ufc_scraper.get_events()
-        st.success(f"✅ {len(st.session_state.ufc_combates)} combates cargados")
-
+        if st.button("🥊 CARGAR UFC", use_container_width=True):
+            with st.spinner("Cargando cartelera UFC..."):
+                # Usar el scraper mejorado que guarda en BD
+                ufc_scraper = st.session_state.scrapers['ufc']
+                st.session_state.ufc_combates = ufc_scraper.get_events()
+                if st.session_state.ufc_combates:
+                    st.success(f"✅ {len(st.session_state.ufc_combates)} combates cargados")
                 else:
                     st.warning("⚠️ No hay eventos UFC disponibles")
 
@@ -281,6 +285,7 @@ if st.button("🥊 CARGAR UFC", use_container_width=True):
                 p1 = c.get('peleador1', {}).get('nombre', '')
                 p2 = c.get('peleador2', {}).get('nombre', '')
                 
+                # Crear partido para visual
                 partido_visual = {
                     'peleador1': {'nombre': p1},
                     'peleador2': {'nombre': p2}
