@@ -3,90 +3,87 @@ import os
 import logging
 import streamlit as st
 import google.generativeai as genai
-from typing import Dict
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class CerebroGeminiPro:
     def __init__(self, api_key=None):
-        # 1. Cargar API Key
-        self.api_key = api_key
-        if not self.api_key:
-            if hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
-                self.api_key = st.secrets['GEMINI_API_KEY']
-            else:
-                self.api_key = os.environ.get('GEMINI_API_KEY', '')
-
+        self.api_key = api_key or self._get_key()
         self.model = None
-        self.model_name = "models/gemini-1.5-flash" # FORZAMOS EL ESTABLE
+        self.model_name = None
         
         if self.api_key:
-            self._conectar_seguro()
+            self._inicializar_adaptativo()
 
-    def _conectar_seguro(self):
-        try:
-            genai.configure(api_key=self.api_key)
-            # Configuramos el modelo estable directamente
-            self.model = genai.GenerativeModel(
-                model_name=self.model_name,
-                generation_config={
-                    "temperature": 0.2,
-                    "max_output_tokens": 250,
-                }
-            )
-            # Prueba real de vida
-            self.model.generate_content("ok", generation_config={"max_output_tokens": 1})
-            logger.info(f"✅ Conectado a {self.model_name}")
-        except Exception as e:
-            logger.error(f"❌ Error crítico: {e}")
-            self.model = None
+    def _get_key(self):
+        if hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
+            return st.secrets['GEMINI_API_KEY']
+        return os.environ.get('GEMINI_API_KEY', '')
 
-    def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis: Dict) -> str:
-        # Si el modelo falló al conectar, usamos fallback inmediato
+    def _inicializar_adaptativo(self):
+        """Prueba modelos en orden de potencia hasta que uno responda (evita 404)"""
+        genai.configure(api_key=self.api_key)
+        
+        # Lista de candidatos (del más nuevo al más estable)
+        candidatos = [
+            'gemini-2.0-flash', 
+            'gemini-1.5-pro', 
+            'gemini-1.5-flash', 
+            'gemini-pro'
+        ]
+        
+        for nombre in candidatos:
+            try:
+                # Intentamos instanciar y hacer una mini-prueba de vida
+                test_model = genai.GenerativeModel(nombre)
+                # Si esto no da error 404, es que el modelo está activo para tu cuenta
+                test_model.generate_content("C", generation_config={"max_output_tokens": 1})
+                
+                self.model = test_model
+                self.model_name = nombre
+                logger.info(f"✅ Modelo adaptado con éxito: {nombre}")
+                break # Salimos del bucle al encontrar el primero que funciona
+            except Exception as e:
+                logger.warning(f"⚠️ El modelo {nombre} no está disponible (Error: {str(e)[:20]}). Probando siguiente...")
+                continue
+
+    def orquestrar_decision_final(self, deporte, partido, analisis):
+        # Si después de todo no hay modelo, fallback
         if not self.model:
-            return self._fallback_response(analisis, "IA Desconectada (Revisa API Key)")
+            return self._fallback_response(analisis, "No se encontró ningún modelo Gemini activo")
 
         try:
-            # Extraer nombres de equipos/peleadores
-            local = self._limpiar_nombre(partido, 'local')
-            visitante = self._limpiar_nombre(partido, 'visitante')
+            local = self._fix_name(partido, 'l')
+            vis = self._fix_name(partido, 'v')
             
-            prompt = f"""Analista Pro: {deporte}
-Evento: {local} vs {visitante}
-Motor: {analisis.get('recomendacion')}
-Confianza: {analisis.get('confianza')}%
-
-Responde con este formato exacto:
+            prompt = f"""Analiza: {deporte} | {local} vs {vis}
+Motor: {analisis.get('recomendacion')} | Confianza: {analisis.get('confianza')}%
+            
+Responde breve:
 MEJOR APUESTA FINAL: [Apuesta]
 PROBABILIDAD ESTIMADA: [XX]%
-RAZÓN PRINCIPAL: [Una frase]
+RAZÓN PRINCIPAL: [Lógica]
 RIESGO: [Bajo/Medio/Alto]
 CONFIANZA IA: [Alta/Media/Baja]"""
 
             response = self.model.generate_content(prompt)
             return response.text.strip()
-
         except Exception as e:
-            return self._fallback_response(analisis, f"Error: Modelo 1.5 en pausa")
+            # Si el modelo muere en medio de la ejecución, intentamos recuperarlo
+            self._inicializar_adaptativo()
+            return self._fallback_response(analisis, f"Re-adaptando modelo... ({str(e)[:30]})")
 
-    def _limpiar_nombre(self, p, tipo):
-        try:
-            if tipo == 'local':
-                n = p.get('home') or p.get('local') or p.get('peleador1', 'Local')
-            else:
-                n = p.get('away') or p.get('visitante') or p.get('peleador2', 'Visitante')
-            
-            if isinstance(n, dict): return n.get('nombre', 'Equipo')
-            return str(n)
-        except: return "Equipo"
+    def _fix_name(self, p, t):
+        key = 'home' if t == 'l' else 'away'
+        alt = 'peleador1' if t == 'l' else 'peleador2'
+        val = p.get(key) or p.get('local' if t == 'l' else 'visitante') or p.get(alt, 'Equipo')
+        return val.get('nombre', val) if isinstance(val, dict) else str(val)
 
     def _fallback_response(self, analisis, motivo):
-        return (f"MEJOR APUESTA FINAL: {analisis.get('recomendacion', 'N/A')}\n"
-                f"PROBABILIDAD ESTIMADA: {analisis.get('confianza', 50)}%\n"
-                f"RAZÓN PRINCIPAL: {motivo}\n"
-                f"RIESGO: Medio\n"
-                f"CONFIANZA IA: N/A")
+        return (f"MEJOR APUESTA FINAL: {analisis.get('recomendacion')}\n"
+                f"PROBABILIDAD ESTIMADA: {analisis.get('confianza')}%\n"
+                f"RAZÓN PRINCIPAL: {motivo}\nRIESGO: Medio\nCONFIANZA IA: N/A")
 
 def get_gemini(api_key=None):
     return CerebroGeminiPro(api_key)
