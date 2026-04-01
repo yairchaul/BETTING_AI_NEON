@@ -1,69 +1,41 @@
 # -*- coding: utf-8 -*-
 """
-MOTOR FÚTBOL PRO V20 - Análisis con Poisson + Monte Carlo
+MOTOR FÚTBOL PRO - Con datos de prueba
 """
 
 import numpy as np
-from scipy.stats import poisson
-import logging
-from database_manager import db
-
-logger = logging.getLogger(__name__)
 
 def analizar_futbol_pro_v20(partido_data):
-    """
-    Analiza partido de fútbol con Poisson + Monte Carlo
+    """Analiza partido de fútbol con datos de prueba"""
+    local = partido_data.get('home', partido_data.get('local', 'Local'))
+    visitante = partido_data.get('away', partido_data.get('visitante', 'Visitante'))
     
-    Args:
-        partido_data: dict con local, visitante, stats
+    # Datos de prueba basados en fuerza percibida
+    equipos_fuertes = ["Real Madrid", "Barcelona", "Manchester City", "Liverpool", "Bayern", "PSG"]
+    equipos_debiles = ["Getafe", "Elche", "Cadiz", "Almeria"]
     
-    Returns:
-        dict con recomendacion, confianza, etc.
-    """
-    local = partido_data.get('home', '')
-    visitante = partido_data.get('away', '')
-    linea_ou = partido_data.get('odds', {}).get('over_under', 2.5)
+    factor_local = 1.3 if local in equipos_fuertes else (0.7 if local in equipos_debiles else 1.0)
+    factor_visit = 1.3 if visitante in equipos_fuertes else (0.7 if visitante in equipos_debiles else 1.0)
     
-    # Obtener últimos 5 partidos
-    goles_local = db.obtener_historial_futbol(local, limite=5)
-    goles_visit = db.obtener_historial_futbol(visitante, limite=5)
+    base_local = 1.8
+    base_visit = 1.5
     
-    if not goles_local or not goles_visit:
-        logger.warning(f"Datos insuficientes para {local} vs {visitante}")
-        # Datos por defecto basados en fuerza del equipo
-        goles_local = [1, 2, 1, 1, 2]
-        goles_visit = [1, 1, 1, 2, 1]
+    expected_local = base_local * factor_local
+    expected_visit = base_visit * factor_visit
+    total_proyectado = expected_local + expected_visit
     
-    # Calcular promedios
-    prom_local = np.mean(goles_local)
-    prom_visit = np.mean(goles_visit)
+    prob_over_25 = 1 / (1 + np.exp(-(total_proyectado - 2.5) / 1.5))
+    prob_btts = 0.5 + (expected_local * expected_visit / 6) * 0.3
+    prob_local_win = 0.45 + (factor_local - factor_visit) * 0.15
     
-    # Proyección Poisson
-    lambda_local = prom_local * 1.02  # ligera ventaja local
-    lambda_visit = prom_visit * 0.98
+    prob_over_25 = min(0.85, max(0.15, prob_over_25))
+    prob_btts = min(0.85, max(0.15, prob_btts))
+    prob_local_win = min(0.75, max(0.25, prob_local_win))
     
-    # Simulación Monte Carlo
-    np.random.seed(42)
-    sim_local = poisson.rvs(lambda_local, size=10000)
-    sim_visit = poisson.rvs(lambda_visit, size=10000)
-    sim_total = sim_local + sim_visit
-    
-    # Probabilidades
-    prob_over = np.mean(sim_total > linea_ou)
-    prob_under = 1 - prob_over
-    prob_btts = np.mean((sim_local > 0) & (sim_visit > 0))
-    prob_local_win = np.mean(sim_local > sim_visit)
-    prob_visit_win = np.mean(sim_visit > sim_local)
-    
-    # Determinar mejor recomendación (jerarquía)
-    if prob_over > 0.6:
-        recomendacion = f"OVER {linea_ou}"
-        confianza = int(prob_over * 100)
-        probabilidad = prob_over
-    elif prob_under > 0.6:
-        recomendacion = f"UNDER {linea_ou}"
-        confianza = int(prob_under * 100)
-        probabilidad = prob_under
+    if prob_over_25 > 0.6:
+        recomendacion = "OVER 2.5"
+        confianza = int(prob_over_25 * 100)
+        probabilidad = prob_over_25
     elif prob_btts > 0.6:
         recomendacion = "BTTS"
         confianza = int(prob_btts * 100)
@@ -72,10 +44,6 @@ def analizar_futbol_pro_v20(partido_data):
         recomendacion = f"GANA {local}"
         confianza = int(prob_local_win * 100)
         probabilidad = prob_local_win
-    elif prob_visit_win > 0.55:
-        recomendacion = f"GANA {visitante}"
-        confianza = int(prob_visit_win * 100)
-        probabilidad = prob_visit_win
     else:
         recomendacion = "SIN VALOR CLARO"
         confianza = 50
@@ -85,54 +53,10 @@ def analizar_futbol_pro_v20(partido_data):
         'recomendacion': recomendacion,
         'confianza': confianza,
         'probabilidad': round(probabilidad * 100, 1),
-        'total_proyectado': round(np.mean(sim_total), 1),
-        'proyeccion_local': round(np.mean(sim_local), 1),
-        'proyeccion_visitante': round(np.mean(sim_visit), 1),
-        'prob_over': round(prob_over * 100, 1),
+        'total_proyectado': round(total_proyectado, 1),
+        'proyeccion_local': round(expected_local, 1),
+        'proyeccion_visitante': round(expected_visit, 1),
+        'prob_over_25': round(prob_over_25 * 100, 1),
         'prob_btts': round(prob_btts * 100, 1),
-        'etiqueta_verde': confianza >= 70,
-        'stats_local': {'goles': goles_local, 'promedio': round(prom_local, 1)},
-        'stats_visitante': {'goles': goles_visit, 'promedio': round(prom_visit, 1)}
-    }
-
-def backtest_futbol_pro_v20(partidos_historicos):
-    """Backtest para evaluar precisión del modelo"""
-    resultados = []
-    for partido in partidos_historicos:
-        try:
-            prediccion = analizar_futbol_pro_v20(partido)
-            real = partido.get('resultado_real', {})
-            acierto = False
-            rec = prediccion.get('recomendacion', '')
-            
-            if 'OVER' in rec:
-                acierto = real.get('total_goles', 0) > partido.get('odds', {}).get('over_under', 2.5)
-            elif 'UNDER' in rec:
-                acierto = real.get('total_goles', 0) < partido.get('odds', {}).get('over_under', 2.5)
-            elif 'BTTS' in rec:
-                acierto = real.get('local_goles', 0) > 0 and real.get('visit_goles', 0) > 0
-            elif 'GANA' in rec:
-                ganador = rec.replace('GANA ', '')
-                if ganador == partido.get('home'):
-                    acierto = real.get('local_goles', 0) > real.get('visit_goles', 0)
-                else:
-                    acierto = real.get('visit_goles', 0) > real.get('local_goles', 0)
-            
-            resultados.append({
-                'partido': f"{partido.get('home')} vs {partido.get('away')}",
-                'prediccion': rec,
-                'acierto': acierto,
-                'confianza': prediccion.get('confianza', 0)
-            })
-        except Exception as e:
-            logger.error(f"Error en backtest: {e}")
-    
-    aciertos = sum(1 for r in resultados if r['acierto'])
-    total = len(resultados)
-    
-    return {
-        'total_partidos': total,
-        'aciertos': aciertos,
-        'precision': round(aciertos / total * 100, 1) if total > 0 else 0,
-        'resultados': resultados
+        'etiqueta_verde': confianza >= 70
     }
