@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 CEREBRO GEMINI PRO - Decisor Final Inteligente
-Versión definitiva con manejo robusto de errores
+Versión definitiva con modelos correctos de Gemini
 """
 
 import os
@@ -14,9 +14,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class CerebroGeminiPro:
-    def __init__(self, api_key=None, modelo="gemini-1.5-flash"):
+    def __init__(self, api_key=None, modelo="gemini-2.0-flash-exp"):
         """
         Inicializa Gemini con la API key desde múltiples fuentes
+        MODELOS DISPONIBLES:
+        - gemini-2.0-flash-exp (recomendado)
+        - gemini-1.5-pro
+        - gemini-1.5-flash
         """
         self.api_key = None
         
@@ -60,9 +64,19 @@ class CerebroGeminiPro:
             self.model = None
             return
         
-        # Configurar Gemini
+        # Configurar Gemini con modelo correcto
         try:
             genai.configure(api_key=self.api_key)
+            
+            # Listar modelos disponibles para debug
+            try:
+                modelos = genai.list_models()
+                modelos_disponibles = [m.name for m in modelos if 'gemini' in m.name]
+                logger.info(f"Modelos disponibles: {modelos_disponibles[:5]}")
+            except:
+                pass
+            
+            # Usar modelo recomendado
             self.model = genai.GenerativeModel(
                 model_name=modelo,
                 generation_config={
