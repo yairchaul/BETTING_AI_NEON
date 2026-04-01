@@ -1,279 +1,225 @@
 # -*- coding: utf-8 -*-
 """
-DATABASE MANAGER - Con Bitácora de Errores y Z-Score
+DATABASE MANAGER - Gestor central de base de datos
+Añadido: métodos para obtener top players por estadística
 """
 
 import sqlite3
+import pandas as pd
 import logging
-import numpy as np
-from contextlib import contextmanager
 from datetime import datetime
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class DatabaseManager:
-    def __init__(self, db_path='data/betting_stats.db'):
+    def __init__(self, db_path="data/betting_stats.db"):
         self.db_path = db_path
-        self._crear_tablas_auditoria()
+        self._init_tables()
     
-    def _crear_tablas_auditoria(self):
-        """Crea tablas de auditoría para el aprendizaje automático"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS auditoria_ia (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        fecha TEXT,
-                        partido TEXT,
-                        deporte TEXT,
-                        proyectado REAL,
-                        real REAL,
-                        error REAL,
-                        z_score REAL,
-                        etiqueta_verde INTEGER DEFAULT 0
-                    )
-                ''')
-                
-                cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS estadisticas_equipos (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        nombre_equipo TEXT,
-                        deporte TEXT,
-                        promedio_pts REAL,
-                        desviacion_std REAL,
-                        ultima_actualizacion TEXT,
-                        partidos_analizados INTEGER
-                    )
-                ''')
-                conn.commit()
-                logger.info("Tablas de auditoría creadas/verificadas")
-        except Exception as e:
-            logger.error(f"Error creando tablas auditoría: {e}")
+    def _init_tables(self):
+        """Inicializa tablas necesarias"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # Tabla de estadísticas de jugadores (para NBA y MLB)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS player_stats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT,
+                equipo TEXT,
+                deporte TEXT,
+                temporada TEXT,
+                puntos REAL,
+                triples_por_partido REAL,
+                intentos_triples REAL,
+                porcentaje_triples REAL,
+                hr INTEGER,
+                avg REAL,
+                rbi INTEGER,
+                slugging REAL,
+                ultima_actualizacion TEXT
+            )
+        ''')
+        
+        # Tabla de equipos
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS equipos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nombre TEXT UNIQUE,
+                deporte TEXT,
+                ciudad TEXT,
+                estadio TEXT
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
     
-    @contextmanager
-    def get_connection(self):
-        """Context manager para conexiones seguras"""
-        conn = None
+    def get_top_player_stat(self, equipo, stat, limit=1, deporte='nba'):
+        """
+        Obtiene el/los mejores jugadores de un equipo por una estadística específica.
+        
+        Args:
+            equipo (str): Nombre del equipo
+            stat (str): 'three_pm', 'hr', 'points', etc.
+            limit (int): Número de jugadores a retornar
+            deporte (str): 'nba' o 'mlb'
+        
+        Returns:
+            list: Lista de diccionarios con los mejores jugadores
+        """
         try:
             conn = sqlite3.connect(self.db_path)
-            yield conn
-        except Exception as e:
-            logger.error(f"Error en conexión DB: {e}")
-            raise
-        finally:
-            if conn:
-                conn.close()
-    
-    def get_team_stats(self, team_name=None, deporte='nba', limit=5):
-        """
-        Obtiene estadísticas de equipos desde historial_equipos
-        """
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                
-                if team_name:
-                    cursor.execute('''
-                        SELECT puntos_favor, puntos_contra, fecha 
-                        FROM historial_equipos 
-                        WHERE nombre_equipo = ? AND deporte = ?
-                        ORDER BY fecha DESC LIMIT ?
-                    ''', (team_name, deporte, limit))
+            
+            if deporte == 'nba':
+                if stat == 'three_pm':
+                    query = '''
+                        SELECT nombre, triples_por_partido, porcentaje_triples, puntos
+                        FROM player_stats 
+                        WHERE equipo LIKE ? AND deporte = 'nba'
+                        ORDER BY triples_por_partido DESC, porcentaje_triples DESC
+                        LIMIT ?
+                    '''
+                elif stat == 'points':
+                    query = '''
+                        SELECT nombre, puntos, triples_por_partido
+                        FROM player_stats 
+                        WHERE equipo LIKE ? AND deporte = 'nba'
+                        ORDER BY puntos DESC
+                        LIMIT ?
+                    '''
                 else:
-                    cursor.execute('''
-                        SELECT nombre_equipo, puntos_favor, puntos_contra, fecha 
-                        FROM historial_equipos 
-                        WHERE deporte = ?
-                        ORDER BY fecha DESC LIMIT ?
-                    ''', (deporte, limit))
-                
-                rows = cursor.fetchall()
-                
-                if team_name and rows:
-                    import numpy as np
-                    pts_favor = [r[0] for r in rows]
-                    pts_contra = [r[1] for r in rows]
-                    return {
-                        'promedio_favor': round(np.mean(pts_favor), 1),
-                        'promedio_contra': round(np.mean(pts_contra), 1),
-                        'desviacion_favor': round(np.std(pts_favor), 1),
-                        'ultimos_favor': pts_favor[:5],
-                        'ultimos_contra': pts_contra[:5],
-                        'partidos': len(rows)
-                    }
-                return rows
-                
+                    return []
+            
+            elif deporte == 'mlb':
+                if stat == 'hr':
+                    query = '''
+                        SELECT nombre, hr, avg, rbi, slugging
+                        FROM player_stats 
+                        WHERE equipo LIKE ? AND deporte = 'mlb'
+                        ORDER BY hr DESC, slugging DESC
+                        LIMIT ?
+                    '''
+                elif stat == 'avg':
+                    query = '''
+                        SELECT nombre, avg, hr, rbi
+                        FROM player_stats 
+                        WHERE equipo LIKE ? AND deporte = 'mlb'
+                        ORDER BY avg DESC
+                        LIMIT ?
+                    '''
+                else:
+                    return []
+            else:
+                return []
+            
+            # Buscar equipo parcialmente
+            equipo_pattern = f'%{equipo}%'
+            cursor = conn.cursor()
+            cursor.execute(query, (equipo_pattern, limit))
+            rows = cursor.fetchall()
+            conn.close()
+            
+            if rows:
+                resultados = []
+                for row in rows:
+                    if deporte == 'nba':
+                        resultados.append({
+                            'nombre': row[0],
+                            'triples_por_partido': row[1],
+                            'porcentaje_triples': row[2],
+                            'puntos': row[3]
+                        })
+                    else:
+                        resultados.append({
+                            'nombre': row[0],
+                            'hr': row[1],
+                            'avg': row[2],
+                            'rbi': row[3],
+                            'slugging': row[4]
+                        })
+                return resultados if limit > 1 else resultados[0]
+            return None
+            
         except Exception as e:
-            logger.error(f"Error en get_team_stats: {e}")
-            return [] if not team_name else None
-    
-    def calcular_estadisticas_equipo(self, equipo, deporte):
-        """Calcula promedio y desviación estándar de un equipo"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT puntos_favor 
-                    FROM historial_equipos 
-                    WHERE nombre_equipo = ? AND deporte = ?
-                    ORDER BY fecha DESC LIMIT 10
-                """, (equipo, deporte))
-                rows = cursor.fetchall()
-                
-                if rows and len(rows) >= 5:
-                    puntos = [r[0] for r in rows]
-                    promedio = np.mean(puntos)
-                    desviacion = np.std(puntos)
-                    return {
-                        'promedio': round(promedio, 1),
-                        'desviacion': round(desviacion, 1),
-                        'muestra': len(puntos),
-                        'ultimos': puntos[:5]
-                    }
-                return None
-        except Exception as e:
-            logger.error(f"Error calculando estadísticas de {equipo}: {e}")
+            logger.error(f"Error obteniendo top player para {equipo} ({stat}): {e}")
             return None
     
-    def registrar_error_proyeccion(self, partido, deporte, proyectado, real, z_score, etiqueta_verde=False):
-        """Registra error para que la IA aprenda de sus fallos"""
+    def get_team_stats(self, equipo, deporte, limit=5):
+        """Obtiene estadísticas históricas de un equipo"""
         try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                error = abs(proyectado - real)
-                fecha = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                
-                cursor.execute('''
-                    INSERT INTO auditoria_ia 
-                    (fecha, partido, deporte, proyectado, real, error, z_score, etiqueta_verde)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (fecha, partido, deporte, proyectado, real, error, z_score, 1 if etiqueta_verde else 0))
-                conn.commit()
-                logger.info(f"Error registrado: {partido} - Error: {error} puntos")
-        except Exception as e:
-            logger.error(f"Error registrando error: {e}")
-    
-    def obtener_historial_nba(self, equipo, limite=5):
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT puntos_favor, puntos_contra 
-                    FROM historial_equipos 
-                    WHERE nombre_equipo = ? AND deporte = 'nba'
-                    ORDER BY fecha DESC LIMIT ?
-                """, (equipo, limite))
-                rows = cursor.fetchall()
-                
-                if rows and len(rows) >= 3:
-                    import numpy as np
-                    pts_f = [r[0] for r in rows]
-                    return {
-                        'puntos_por_partido': np.mean(pts_f),
-                        'ultimos_puntos': pts_f,
-                        'desviacion': np.std(pts_f),
-                        'registros': len(rows)
-                    }
-                return None
-        except Exception as e:
-            logger.error(f"Error obteniendo historial NBA de {equipo}: {e}")
-            return None
-    
-    def obtener_historial_mlb(self, equipo, limite=5):
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT puntos_favor, puntos_contra 
-                    FROM historial_equipos 
-                    WHERE nombre_equipo = ? AND deporte = 'mlb'
-                    ORDER BY fecha DESC LIMIT ?
-                """, (equipo, limite))
-                rows = cursor.fetchall()
-                
-                if rows and len(rows) >= 3:
-                    import numpy as np
-                    pts_f = [r[0] for r in rows]
-                    return {
-                        'carreras_por_partido': np.mean(pts_f),
-                        'ultimas_carreras': pts_f,
-                        'desviacion': np.std(pts_f)
-                    }
-                return None
-        except Exception as e:
-            logger.error(f"Error obteniendo historial MLB de {equipo}: {e}")
-            return None
-    
-    def obtener_historial_futbol(self, equipo, limite=5):
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT puntos_favor 
-                    FROM historial_equipos 
-                    WHERE nombre_equipo = ? AND deporte = 'futbol'
-                    ORDER BY fecha DESC LIMIT ?
-                """, (equipo, limite))
-                rows = cursor.fetchall()
-                
-                if rows and len(rows) >= 3:
-                    return [r[0] for r in rows]
-                return None
-        except Exception as e:
-            logger.error(f"Error obteniendo historial fútbol de {equipo}: {e}")
-            return None
-    
-    def obtener_peleador_ufc(self, nombre):
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT nombre, record, altura, peso, alcance, postura, ko_rate, grappling
-                    FROM peleadores_ufc 
-                    WHERE nombre LIKE ? OR nombre = ?
-                    LIMIT 1
-                """, (f"%{nombre}%", nombre))
-                row = cursor.fetchone()
-                
-                if row:
-                    return {
-                        'nombre': row[0],
-                        'record': row[1] if row[1] else '0-0-0',
-                        'altura': row[2] if row[2] else 'N/A',
-                        'peso': row[3] if row[3] else 'N/A',
-                        'alcance': row[4] if row[4] else 'N/A',
-                        'postura': row[5] if row[5] else 'Desconocida',
-                        'ko_rate': row[6] if row[6] else 0.5,
-                        'grappling': row[7] if row[7] else 0.5
-                    }
-                return None
-        except Exception as e:
-            logger.error(f"Error obteniendo peleador UFC {nombre}: {e}")
-            return None
-    
-    def obtener_estadisticas_aprendizaje(self, deporte):
-        """Obtiene estadísticas de aprendizaje para mejorar predicciones"""
-        try:
-            with self.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT AVG(error) as error_medio, 
-                           COUNT(*) as total_errores,
-                           AVG(z_score) as z_medio
-                    FROM auditoria_ia 
-                    WHERE deporte = ? AND fecha > date('now', '-30 days')
-                """, (deporte,))
-                row = cursor.fetchone()
+            conn = sqlite3.connect(self.db_path)
+            query = '''
+                SELECT AVG(puntos_favor) as promedio_favor, 
+                       AVG(puntos_contra) as promedio_contra,
+                       COUNT(*) as partidos
+                FROM historial_equipos 
+                WHERE nombre_equipo LIKE ? AND deporte = ?
+                ORDER BY fecha DESC
+                LIMIT ?
+            '''
+            cursor = conn.cursor()
+            cursor.execute(query, (f'%{equipo}%', deporte, limit))
+            row = cursor.fetchone()
+            conn.close()
+            
+            if row and row[0]:
                 return {
-                    'error_medio': round(row[0], 1) if row[0] else 0,
-                    'total_errores': row[1] if row[1] else 0,
-                    'z_medio': round(row[2], 2) if row[2] else 0
+                    'promedio_favor': row[0],
+                    'promedio_contra': row[1],
+                    'partidos': row[2]
                 }
+            return {}
         except Exception as e:
-            logger.error(f"Error obteniendo estadísticas aprendizaje: {e}")
-            return {'error_medio': 0, 'total_errores': 0, 'z_medio': 0}
+            logger.error(f"Error obteniendo stats de {equipo}: {e}")
+            return {}
+    
+    def guardar_player_stats(self, stats_list, deporte):
+        """Guarda estadísticas de jugadores en BD"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            
+            for stat in stats_list:
+                if deporte == 'nba':
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO player_stats 
+                        (nombre, equipo, deporte, temporada, puntos, triples_por_partido, 
+                         intentos_triples, porcentaje_triples, ultima_actualizacion)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        stat.get('nombre'),
+                        stat.get('equipo'),
+                        'nba',
+                        stat.get('temporada', '2025'),
+                        stat.get('puntos', 0),
+                        stat.get('triples_por_partido', 0),
+                        stat.get('intentos_triples', 0),
+                        stat.get('porcentaje_triples', 0),
+                        datetime.now().isoformat()
+                    ))
+                elif deporte == 'mlb':
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO player_stats 
+                        (nombre, equipo, deporte, temporada, hr, avg, rbi, slugging, ultima_actualizacion)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (
+                        stat.get('nombre'),
+                        stat.get('equipo'),
+                        'mlb',
+                        stat.get('temporada', '2025'),
+                        stat.get('hr', 0),
+                        stat.get('avg', 0),
+                        stat.get('rbi', 0),
+                        stat.get('slugging', 0),
+                        datetime.now().isoformat()
+                    ))
+            
+            conn.commit()
+            conn.close()
+            logger.info(f"✅ {len(stats_list)} jugadores guardados para {deporte}")
+        except Exception as e:
+            logger.error(f"Error guardando player stats: {e}")
 
 # Instancia global
 db = DatabaseManager()
