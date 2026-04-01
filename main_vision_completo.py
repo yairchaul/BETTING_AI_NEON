@@ -51,13 +51,14 @@ def get_gemini_api_key():
         return ""
 
 def inicializar_bd_ufc():
-    """Inicializa BD UFC de forma segura y limpia"""
+    """Inicializa la base de datos UFC de forma segura y limpia"""
     os.makedirs("data", exist_ok=True)
+    
     try:
         conn = sqlite3.connect("data/betting_stats.db")
         cursor = conn.cursor()
 
-        # Tabla eventos
+        # Crear tabla eventos
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS eventos_ufc (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,7 +69,7 @@ def inicializar_bd_ufc():
             )
         ''')
 
-        # Tabla peleadores (id autoincremental)
+        # Crear tabla peleadores (id autoincremental)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS peleadores_ufc (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,6 +103,7 @@ def inicializar_bd_ufc():
                     (nombre, record, altura, peso, alcance, postura, ko_rate, grappling, odds, ultima_actualizacion)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ''', (*p, datetime.now().isoformat()))
+            
             logger.info(f"✅ Insertados {len(peleadores_prueba)} peleadores de prueba")
 
         # Insertar evento de prueba si no existe
