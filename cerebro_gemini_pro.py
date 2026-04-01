@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-CEREBRO GEMINI PRO - Decisor Final con mejor manejo de errores
+CEREBRO GEMINI PRO - Decisor Final Inteligente
+Versión definitiva con manejo robusto de errores
 """
 
 import os
@@ -14,97 +15,170 @@ logger = logging.getLogger(__name__)
 
 class CerebroGeminiPro:
     def __init__(self, api_key=None, modelo="gemini-1.5-flash"):
-        self.api_key = api_key
+        """
+        Inicializa Gemini con la API key desde múltiples fuentes
+        """
+        self.api_key = None
         
-        # Si no se pasó API key, intentar obtenerla
+        # 1. Intentar con la API key pasada como argumento
+        if api_key:
+            self.api_key = api_key
+            logger.info("API key recibida como argumento")
+        
+        # 2. Intentar con st.secrets (Streamlit Cloud)
         if not self.api_key:
             try:
                 if hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
                     self.api_key = st.secrets['GEMINI_API_KEY']
-                    st.sidebar.success("✅ Gemini key cargada desde secrets")
-            except:
-                pass
+                    if self.api_key:
+                        logger.info("API key cargada desde st.secrets")
+            except Exception as e:
+                logger.warning(f"Error leyendo secrets: {e}")
         
+        # 3. Intentar con archivo .env (local)
         if not self.api_key:
             try:
                 with open('.env', 'r') as f:
                     for linea in f:
                         if 'GEMINI_API_KEY' in linea:
                             self.api_key = linea.split('=')[1].strip().strip('"').strip("'")
-                            break
-            except:
-                pass
+                            if self.api_key:
+                                logger.info("API key cargada desde .env")
+                                break
+            except Exception as e:
+                logger.warning(f"Error leyendo .env: {e}")
         
+        # 4. Intentar con variable de entorno
         if not self.api_key:
-            logger.warning("❌ No hay API key de Gemini")
+            self.api_key = os.environ.get('GEMINI_API_KEY', '')
+            if self.api_key:
+                logger.info("API key cargada desde variable de entorno")
+        
+        # Verificar si tenemos API key
+        if not self.api_key:
+            logger.error("❌ No se encontró API key de Gemini")
             self.model = None
             return
-
+        
+        # Configurar Gemini
         try:
             genai.configure(api_key=self.api_key)
-            self.model = genai.GenerativeModel(modelo)
-            logger.info(f"✅ Gemini Pro conectado ({modelo})")
+            self.model = genai.GenerativeModel(
+                model_name=modelo,
+                generation_config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 300,
+                    "top_p": 0.95
+                }
+            )
+            logger.info(f"✅ Gemini Pro conectado exitosamente ({modelo})")
         except Exception as e:
-            logger.error(f"Error Gemini: {e}")
+            logger.error(f"❌ Error conectando Gemini: {e}")
             self.model = None
 
     def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis: Dict) -> str:
-        """Decisor final inteligente con análisis de valor real"""
+        """
+        Decisor final inteligente con análisis de valor real
+        """
         if not self.model:
-            return self._fallback_response(analisis)
+            return self._fallback_response(analisis, "Gemini no disponible")
+        
+        try:
+            # Extraer nombres según deporte
+            local = self._extraer_nombre_local(deporte, partido)
+            visitante = self._extraer_nombre_visitante(deporte, partido)
+            
+            # Extraer datos del análisis
+            recomendacion = analisis.get('recomendacion', 'N/A')
+            confianza = analisis.get('confianza', 50)
+            total = analisis.get('total_proyectado', 'N/A')
+            edge = analisis.get('edge', 0)
+            probabilidad = analisis.get('probabilidad', confianza)
+            
+            # Crear prompt optimizado
+            prompt = self._crear_prompt(deporte, local, visitante, recomendacion, confianza, total, edge, probabilidad)
+            
+            # Llamar a Gemini
+            response = self.model.generate_content(prompt)
+            texto = response.text.strip()
+            
+            # Validar respuesta
+            if self._validar_respuesta(texto):
+                return texto
+            
+            # Si la respuesta no tiene el formato esperado, usar fallback
+            logger.warning("Respuesta de Gemini con formato incorrecto, usando fallback")
+            return self._fallback_response(analisis, "Formato de respuesta incorrecto")
+            
+        except Exception as e:
+            logger.error(f"Error en Gemini: {e}")
+            return self._fallback_response(analisis, f"Error técnico: {str(e)[:50]}")
 
-        # Extraer nombres según deporte
+    def _extraer_nombre_local(self, deporte: str, partido: Dict) -> str:
+        """Extrae el nombre del equipo/peleador local"""
         if deporte.upper() == "UFC":
             p1 = partido.get('peleador1', {})
+            if isinstance(p1, dict):
+                return p1.get('nombre', partido.get('peleador1', 'Local'))
+            return str(p1)
+        return partido.get('home', partido.get('local', 'Local'))
+
+    def _extraer_nombre_visitante(self, deporte: str, partido: Dict) -> str:
+        """Extrae el nombre del equipo/peleador visitante"""
+        if deporte.upper() == "UFC":
             p2 = partido.get('peleador2', {})
-            local = p1.get('nombre', partido.get('peleador1', 'Local')) if isinstance(p1, dict) else p1
-            visitante = p2.get('nombre', partido.get('peleador2', 'Visitante')) if isinstance(p2, dict) else p2
-        else:
-            local = partido.get('home', partido.get('local', 'Local'))
-            visitante = partido.get('away', partido.get('visitante', 'Visitante'))
+            if isinstance(p2, dict):
+                return p2.get('nombre', partido.get('peleador2', 'Visitante'))
+            return str(p2)
+        return partido.get('away', partido.get('visitante', 'Visitante'))
 
-        recomendacion = analisis.get('recomendacion', 'N/A')
-        confianza = analisis.get('confianza', 0)
-        total = analisis.get('total_proyectado', 0)
-        edge = analisis.get('edge', 0)
-        probabilidad = analisis.get('probabilidad', confianza)
+    def _crear_prompt(self, deporte, local, visitante, recomendacion, confianza, total, edge, probabilidad):
+        """Crea el prompt optimizado para Gemini"""
+        return f"""
+Eres un analista profesional de apuestas deportivas con 15 años de experiencia.
 
-        # Prompt simplificado para evitar errores
-        prompt = f"""
-Analiza este partido de {deporte.upper()}:
-{local} vs {visitante}
+**Deporte:** {deporte.upper()}
+**Partido:** {local} vs {visitante}
 
-Análisis del motor:
+**Análisis del Motor:**
 - Recomendación: {recomendacion}
-- Confianza: {confianza}%
+- Confianza matemática: {confianza}%
+- Probabilidad: {probabilidad}%
 - Total proyectado: {total}
 - Edge: {edge:.1f}%
 
-Responde SOLO con este formato exacto:
+**Instrucciones:**
+- Analiza si la recomendación tiene valor real
+- Sé honesto: si no hay valor claro, di "NO RECOMENDAR"
+- Responde SOLO con este formato exacto (sin texto adicional):
+
 MEJOR APUESTA FINAL: [apuesta]
 PROBABILIDAD ESTIMADA: XX%
-RAZÓN PRINCIPAL: [una línea]
+RAZÓN PRINCIPAL: [una línea clara]
 RIESGO: [Bajo/Medio/Alto]
 CONFIANZA IA: [Alta/Media/Baja]
 """
 
-        try:
-            response = self.model.generate_content(prompt)
-            texto = response.text.strip()
-            if "MEJOR APUESTA FINAL" in texto:
-                return texto
-            return self._fallback_response(analisis)
-        except Exception as e:
-            logger.error(f"Error en Gemini: {e}")
-            return self._fallback_response(analisis)
+    def _validar_respuesta(self, texto: str) -> bool:
+        """Valida que la respuesta tenga el formato esperado"""
+        return all(key in texto for key in ["MEJOR APUESTA FINAL", "PROBABILIDAD ESTIMADA", "RAZÓN PRINCIPAL", "RIESGO", "CONFIANZA IA"])
 
-    def _fallback_response(self, analisis):
-        return f"""MEJOR APUESTA FINAL: {analisis.get('recomendacion', 'N/A')}
-PROBABILIDAD ESTIMADA: {analisis.get('confianza', 50)}%
-RAZÓN PRINCIPAL: Gemini no disponible - usando motor matemático
+    def _fallback_response(self, analisis: Dict, motivo: str = "Fallback") -> str:
+        """Respuesta de respaldo cuando Gemini no está disponible"""
+        recomendacion = analisis.get('recomendacion', 'N/A')
+        confianza = analisis.get('confianza', 50)
+        
+        return f"""MEJOR APUESTA FINAL: {recomendacion}
+PROBABILIDAD ESTIMADA: {confianza}%
+RAZÓN PRINCIPAL: {motivo} - usando motor matemático
 RIESGO: Medio
 CONFIANZA IA: Media"""
 
+    def analizar_con_decision(self, partido, analisis_heuristico):
+        """Método de compatibilidad"""
+        return self.orquestrar_decision_final("NBA", partido, analisis_heuristico)
+
 
 def get_gemini(api_key=None):
+    """Función helper para mantener compatibilidad"""
     return CerebroGeminiPro(api_key)
