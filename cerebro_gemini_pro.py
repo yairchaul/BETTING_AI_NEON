@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 CEREBRO GEMINI PRO - Decisor Final Inteligente
-Versión definitiva con modelos correctos de Gemini
+Versión definitiva con modelo estable
 """
 
 import os
@@ -14,13 +14,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class CerebroGeminiPro:
-    def __init__(self, api_key=None, modelo="gemini-2.0-flash-exp"):
+    def __init__(self, api_key=None, modelo="gemini-1.5-pro"):
         """
         Inicializa Gemini con la API key desde múltiples fuentes
-        MODELOS DISPONIBLES:
-        - gemini-2.0-flash-exp (recomendado)
-        - gemini-1.5-pro
-        - gemini-1.5-flash
+        MODELOS ESTABLES:
+        - gemini-1.5-pro (recomendado, más potente)
+        - gemini-1.5-flash (más rápido)
         """
         self.api_key = None
         
@@ -64,19 +63,11 @@ class CerebroGeminiPro:
             self.model = None
             return
         
-        # Configurar Gemini con modelo correcto
+        # Configurar Gemini con modelo estable
         try:
             genai.configure(api_key=self.api_key)
             
-            # Listar modelos disponibles para debug
-            try:
-                modelos = genai.list_models()
-                modelos_disponibles = [m.name for m in modelos if 'gemini' in m.name]
-                logger.info(f"Modelos disponibles: {modelos_disponibles[:5]}")
-            except:
-                pass
-            
-            # Usar modelo recomendado
+            # Usar modelo estable gemini-1.5-pro
             self.model = genai.GenerativeModel(
                 model_name=modelo,
                 generation_config={
@@ -126,7 +117,7 @@ class CerebroGeminiPro:
             
         except Exception as e:
             logger.error(f"Error en Gemini: {e}")
-            return self._fallback_response(analisis, f"Error técnico: {str(e)[:50]}")
+            return self._fallback_response(analisis, f"Error técnico")
 
     def _extraer_nombre_local(self, deporte: str, partido: Dict) -> str:
         """Extrae el nombre del equipo/peleador local"""
