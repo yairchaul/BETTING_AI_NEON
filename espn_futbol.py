@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-ESPN FÚTBOL - Módulo exclusivo para fútbol con gestor universal
+ESPN FÚTBOL - Módulo con estadísticas de equipos (últimos 5 partidos)
 """
 
-import logging
 import requests
-import json
+import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 class GestorLigasUniversal:
-    """Gestor de ligas que obtiene datos desde API de ESPN"""
+    """Gestor de ligas que obtiene datos desde API de ESPN con estadísticas"""
     
     def __init__(self):
         self.headers = {
@@ -42,19 +42,62 @@ class GestorLigasUniversal:
         except Exception as e:
             logger.error(f"Error obteniendo ligas: {e}")
         
-        # Fallback: ligas populares
+        # Fallback: ligas populares (dinámico, se actualizará cuando API funcione)
         self._ligas_cache = [
             "Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1",
             "Liga MX", "MLS", "Eredivisie", "Primeira Liga", "Scottish Premiership",
-            "Russian Premier League", "Turkish Super Lig", "Belgian Pro League",
-            "Swiss Super League", "Austrian Bundesliga", "Greek Super League",
-            "Czech First League", "Croatian First League", "Danish Superliga",
-            "Norwegian Eliteserien", "Swedish Allsvenskan", "Polish Ekstraklasa"
+            "A-League", "J1 League", "K League 1", "Saudi Pro League",
+            "Argentine Liga Profesional", "Brazilian Serie A", "Chilean Primera Division"
         ]
         return self._ligas_cache
     
+    def obtener_estadisticas_equipo(self, equipo_nombre, liga_id):
+        """Obtiene últimos 5 partidos de un equipo"""
+        try:
+            # Buscar ID del equipo
+            api_url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{liga_id}/teams"
+            response = requests.get(api_url, headers=self.headers, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                for team in data.get('teams', []):
+                    if equipo_nombre.lower() in team.get('displayName', '').lower():
+                        team_id = team.get('id')
+                        if team_id:
+                            # Obtener resultados del equipo
+                            schedule_url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{liga_id}/teams/{team_id}/schedule"
+                            schedule_resp = requests.get(schedule_url, headers=self.headers, timeout=10)
+                            
+                            if schedule_resp.status_code == 200:
+                                schedule_data = schedule_resp.json()
+                                events = schedule_data.get('events', [])[:5]
+                                
+                                resultados = []
+                                goles = []
+                                for event in events:
+                                    competitions = event.get('competitions', [])
+                                    for comp in competitions:
+                                        competitors = comp.get('competitors', [])
+                                        for c in competitors:
+                                            if c.get('team', {}).get('id') == team_id:
+                                                score = c.get('score', '0')
+                                                goles.append(int(score) if score.isdigit() else 0)
+                                                resultados.append(c.get('winner', False))
+                                
+                                if resultados:
+                                    return {
+                                        'goles': goles,
+                                        'promedio': sum(goles) / len(goles) if goles else 0,
+                                        'victorias': sum(resultados),
+                                        'partidos': len(resultados)
+                                    }
+            return None
+        except Exception as e:
+            logger.debug(f"Error obteniendo estadísticas de {equipo_nombre}: {e}")
+            return None
+    
     def obtener_partidos(self, liga_nombre):
-        """Obtiene partidos de una liga específica"""
+        """Obtiene partidos de una liga específica con estadísticas"""
         # Mapeo de ligas a IDs
         ligas_ids = {
             "Premier League": "eng.1",
@@ -67,6 +110,9 @@ class GestorLigasUniversal:
             "Eredivisie": "ned.1",
             "Primeira Liga": "por.1",
             "Scottish Premiership": "sco.1",
+            "A-League": "aus.1",
+            "J1 League": "jpn.1",
+            "K League 1": "kor.1",
         }
         
         league_id = ligas_ids.get(liga_nombre)
@@ -85,14 +131,23 @@ class GestorLigasUniversal:
                     for comp in event.get('competitions', []):
                         competitors = comp.get('competitors', [])
                         if len(competitors) >= 2:
-                            local = competitors[0].get('team', {}).get('displayName', '')
-                            visitante = competitors[1].get('team', {}).get('displayName', '')
+                            local_data = competitors[0].get('team', {})
+                            visitante_data = competitors[1].get('team', {})
+                            
+                            local = local_data.get('displayName', '')
+                            visitante = visitante_data.get('displayName', '')
+                            
+                            # Obtener estadísticas de ambos equipos
+                            stats_local = self.obtener_estadisticas_equipo(local, league_id)
+                            stats_visitante = self.obtener_estadisticas_equipo(visitante, league_id)
                             
                             partidos.append({
                                 'home': local,
                                 'away': visitante,
                                 'liga': liga_nombre,
-                                'status': 'programado'
+                                'status': 'programado',
+                                'stats_local': stats_local,
+                                'stats_visitante': stats_visitante
                             })
                 
                 return partidos
@@ -111,5 +166,5 @@ class ESPN_FUTBOL:
         return self.gestor.obtener_ligas()
     
     def get_games(self, liga):
-        """Obtiene partidos de una liga específica"""
+        """Obtiene partidos de una liga específica con estadísticas"""
         return self.gestor.obtener_partidos(liga)
