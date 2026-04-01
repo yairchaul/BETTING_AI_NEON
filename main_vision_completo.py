@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-MAIN VISION COMPLETO - NEON V20 (Versión Final Estable para Streamlit Cloud)
-Sin Selenium + Datos de prueba robustos + Gemini mejorado
+MAIN VISION COMPLETO - NEON V20 (Versión Final - Estable y Robusta)
+Mejoras sin romper nada esencial
 """
 
 import streamlit as st
@@ -29,16 +29,36 @@ from database_manager import db
 from render_unificado import render_analisis_card
 
 # ==================== MOTORES V20 ====================
-from motor_nba_pro_v17 import analizar_nba_pro_v17
-from motor_mlb_pro import analizar_mlb_pro_v20
-from motor_ufc_pro import analizar_ufc_pro_v20
-from motor_fut_pro import analizar_futbol_pro_v20
+try:
+    from motor_nba_pro_v17 import analizar_nba_pro_v17
+except ImportError:
+    analizar_nba_pro_v17 = None
+    logger.warning("motor_nba_pro_v17 no disponible")
 
-# ==================== CEREBRO GEMINI ====================
+try:
+    from motor_mlb_pro import analizar_mlb_pro_v20
+except ImportError:
+    analizar_mlb_pro_v20 = None
+    logger.warning("motor_mlb_pro no disponible")
+
+try:
+    from motor_ufc_pro import analizar_ufc_pro_v20
+except ImportError:
+    analizar_ufc_pro_v20 = None
+    logger.warning("motor_ufc_pro no disponible")
+
+try:
+    from motor_fut_pro import analizar_futbol_pro_v20
+except ImportError:
+    analizar_futbol_pro_v20 = None
+    logger.warning("motor_fut_pro no disponible")
+
+# ==================== GEMINI PRO ====================
 try:
     from cerebro_gemini_pro import CerebroGeminiPro
 except ImportError:
     CerebroGeminiPro = None
+    logger.warning("cerebro_gemini_pro no encontrado")
 
 # ==================== FUNCIONES AUXILIARES ====================
 def get_gemini_api_key():
@@ -50,16 +70,27 @@ def get_gemini_api_key():
     except:
         return ""
 
-def inicializar_bd():
-    """Crea tablas y datos de prueba si no existen"""
+def inicializar_bd_ufc():
+    """Inicializa BD UFC con datos de prueba"""
     os.makedirs("data", exist_ok=True)
     conn = sqlite3.connect("data/betting_stats.db")
     cursor = conn.cursor()
     
-    # Tabla peleadores UFC
+    # Tabla eventos
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS eventos_ufc (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT,
+            fecha TEXT,
+            cartelera TEXT,
+            ultima_actualizacion TEXT
+        )
+    ''')
+    
+    # Tabla peleadores
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS peleadores_ufc (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             nombre TEXT UNIQUE,
             record TEXT,
             altura REAL,
@@ -68,11 +99,12 @@ def inicializar_bd():
             postura TEXT,
             ko_rate REAL,
             grappling REAL,
-            odds TEXT
+            odds TEXT,
+            ultima_actualizacion TEXT
         )
     ''')
     
-    # Insertar datos de prueba si está vacío
+    # Datos de prueba si está vacío
     cursor.execute("SELECT COUNT(*) FROM peleadores_ufc")
     if cursor.fetchone()[0] == 0:
         peleadores = [
@@ -80,21 +112,76 @@ def inicializar_bd():
             ("Joe Pyfer", "15-3-0", 188, 84, 190, "Boxing", 0.6, 0.5, "-106"),
             ("Bruna Brasil", "11-6-1", 167, 52, 166, "MMA", 0.9, 0.5, "+390"),
             ("Alexia Thainara", "13-1-0", 162, 52, 170, "MMA", 0.5, 0.5, "-520"),
+            ("Maycee Barber", "15-2-0", 165, 57, 165, "MMA", 0.9, 0.5, "-148"),
+            ("Alexa Grasso", "16-5-1", 165, 57, 167, "MMA", 0.5, 0.6, "+124"),
         ]
         for p in peleadores:
             cursor.execute('''
                 INSERT OR IGNORE INTO peleadores_ufc 
-                (nombre, record, altura, peso, alcance, postura, ko_rate, grappling, odds)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ''', p)
+                (nombre, record, altura, peso, alcance, postura, ko_rate, grappling, odds, ultima_actualizacion)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (*p, datetime.now().isoformat()))
+    
+    # Evento de prueba
+    cursor.execute("SELECT COUNT(*) FROM eventos_ufc")
+    if cursor.fetchone()[0] == 0:
+        cartelera = [
+            {"peleador1": "Israel Adesanya", "peleador2": "Joe Pyfer"},
+            {"peleador1": "Bruna Brasil", "peleador2": "Alexia Thainara"},
+        ]
+        cursor.execute('''
+            INSERT INTO eventos_ufc (nombre, fecha, cartelera, ultima_actualizacion)
+            VALUES (?, ?, ?, ?)
+        ''', ("UFC Fight Night", datetime.now().strftime("%Y-%m-%d"), json.dumps(cartelera), datetime.now().isoformat()))
     
     conn.commit()
     conn.close()
+    logger.info("✅ Base de datos UFC inicializada")
+
+def obtener_peleador_detalle(nombre):
+    try:
+        conn = sqlite3.connect("data/betting_stats.db")
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT nombre, record, altura, peso, alcance, ko_rate, odds
+            FROM peleadores_ufc WHERE nombre LIKE ? OR nombre = ? LIMIT 1
+        ''', (f"%{nombre}%", nombre))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return {
+                'nombre': row[0],
+                'record': row[1] or '0-0-0',
+                'altura': int(row[2]) if row[2] else 0,
+                'peso': row[3] if row[3] else 0,
+                'alcance': int(row[4]) if row[4] else 0,
+                'ko_rate': row[5] or 0.5,
+                'odds': row[6] or 'N/A'
+            }
+        return None
+    except:
+        return None
+
+def obtener_cartelera_ufc():
+    """Obtiene la cartelera UFC desde la BD"""
+    try:
+        conn = sqlite3.connect("data/betting_stats.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT cartelera FROM eventos_ufc ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0]:
+            return json.loads(row[0])
+        return []
+    except:
+        return []
 
 def main():
     if 'init' not in st.session_state:
-        inicializar_bd()
+        # Inicializar BD UFC
+        inicializar_bd_ufc()
         
+        # Scrapers
         st.session_state.scrapers = {
             'nba': ESPN_NBA(),
             'mlb': ESPN_MLB(),
@@ -119,9 +206,12 @@ def main():
         gemini_key = get_gemini_api_key()
         if gemini_key and CerebroGeminiPro:
             st.session_state.gemini = CerebroGeminiPro(gemini_key)
+            st.success("✅ Gemini conectado - Decisor Final activo")
         else:
             st.session_state.gemini = None
+            st.warning("⚠️ Gemini no disponible - Solo análisis matemático")
         
+        # Estado
         st.session_state.nba_partidos = []
         st.session_state.ufc_combates = []
         st.session_state.futbol_partidos = {}
@@ -137,71 +227,120 @@ def main():
         if st.button("🏀 CARGAR NBA", use_container_width=True):
             with st.spinner("Cargando NBA..."):
                 st.session_state.nba_partidos = st.session_state.scrapers['nba'].get_games()
-                st.success(f"✅ {len(st.session_state.nba_partidos)} partidos") if st.session_state.nba_partidos else st.warning("No hay partidos NBA hoy")
+                if st.session_state.nba_partidos:
+                    st.success(f"✅ {len(st.session_state.nba_partidos)} partidos")
+                else:
+                    st.warning("⚠️ No hay partidos NBA hoy")
 
         if st.button("⚾ CARGAR MLB", use_container_width=True):
             with st.spinner("Cargando MLB..."):
                 st.session_state.mlb_partidos = st.session_state.scrapers['mlb'].get_games()
-                st.success(f"✅ {len(st.session_state.mlb_partidos)} partidos") if st.session_state.mlb_partidos else st.warning("No hay partidos MLB hoy")
+                if st.session_state.mlb_partidos:
+                    st.success(f"✅ {len(st.session_state.mlb_partidos)} partidos")
+                else:
+                    st.warning("⚠️ No hay partidos MLB hoy")
 
         if st.button("🥊 CARGAR UFC", use_container_width=True):
             with st.spinner("Cargando UFC..."):
-                st.session_state.ufc_combates = st.session_state.scrapers['ufc'].get_events()
-                st.success(f"✅ {len(st.session_state.ufc_combates)} combates") if st.session_state.ufc_combates else st.warning("No hay eventos UFC hoy")
+                # Intentar obtener cartelera desde BD primero
+                cartelera = obtener_cartelera_ufc()
+                if cartelera:
+                    st.session_state.ufc_combates = cartelera
+                    st.success(f"✅ {len(cartelera)} combates desde BD")
+                else:
+                    # Fallback al scraper
+                    st.session_state.ufc_combates = st.session_state.scrapers['ufc'].get_events()
+                    if st.session_state.ufc_combates:
+                        st.success(f"✅ {len(st.session_state.ufc_combates)} combates")
+                    else:
+                        st.warning("⚠️ No hay eventos UFC disponibles")
 
         st.markdown("---")
         st.subheader("⚽ FÚTBOL")
         buscar_liga = st.text_input("🔍 Buscar liga:", placeholder="Ej: Premier, LaLiga, Liga MX...")
-        ligas_filtradas = [l for l in ["Premier League", "La Liga", "Serie A", "Bundesliga", "Liga MX"] 
-                          if buscar_liga.lower() in l.lower()] if buscar_liga else ["Premier League", "La Liga", "Serie A", "Bundesliga", "Liga MX"]
+        ligas = ["Premier League", "La Liga", "Serie A", "Bundesliga", "Ligue 1", "Liga MX"]
+        ligas_filtradas = [l for l in ligas if buscar_liga.lower() in l.lower()] if buscar_liga else ligas
         
         for liga in ligas_filtradas:
             if st.button(f"⚽ {liga}", key=f"btn_{liga}", use_container_width=True):
                 with st.spinner(f"Cargando {liga}..."):
                     partidos = st.session_state.scrapers['futbol'].get_games(liga)
                     st.session_state.futbol_partidos[liga] = partidos
-                    st.success(f"✅ {len(partidos)} partidos")
+                    if partidos:
+                        st.success(f"✅ {len(partidos)} partidos")
+                    else:
+                        st.warning(f"⚠️ No hay partidos de {liga} hoy")
+
+        if st.button("🧹 LIMPIAR CACHÉ", use_container_width=True):
+            st.session_state.futbol_partidos = {}
+            st.rerun()
+
+        if st.button("🔄 RESET TOTAL", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
 
     # ==================== TABS ====================
     tab1, tab2, tab3, tab4 = st.tabs(["🏀 NBA", "🥊 UFC", "⚽ FÚTBOL", "⚾ MLB"])
 
-    with tab1:  # NBA
+    # ==================== TAB NBA ====================
+    with tab1:
         if st.session_state.nba_partidos:
             for idx, p in enumerate(st.session_state.nba_partidos):
                 accion = st.session_state.visual_nba.render(p, idx, st.session_state.tracker, None, None, None)
                 if accion == "analizar":
-                    with st.spinner("🏀 Analizando NBA..."):
-                        resultado = st.session_state.motores['nba'](p)
-                        render_analisis_card(resultado)
-                        
-                        if st.session_state.gemini:
-                            gemini_resp = st.session_state.gemini.orquestrar_decision_final("NBA", p, resultado)
-                            st.markdown("### 🤖 GEMINI - DECISOR FINAL")
-                            st.info(gemini_resp)
+                    with st.spinner("🏀 Analizando NBA con Motor v20..."):
+                        try:
+                            if st.session_state.motores['nba']:
+                                resultado = st.session_state.motores['nba'](p)
+                                render_analisis_card(resultado)
+                                
+                                if st.session_state.gemini:
+                                    gemini_resp = st.session_state.gemini.orquestrar_decision_final("NBA", p, resultado)
+                                    st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                                    st.info(gemini_resp)
+                            else:
+                                st.error("Motor NBA no disponible")
+                        except Exception as e:
+                            st.error(f"Error en análisis NBA: {e}")
                 st.markdown("---")
         else:
             st.info("👈 Carga NBA en el sidebar")
 
-    with tab2:  # UFC
+    # ==================== TAB UFC ====================
+    with tab2:
         if st.session_state.ufc_combates:
             for idx, c in enumerate(st.session_state.ufc_combates):
-                p1 = c.get('peleador1', {}).get('nombre', '')
-                p2 = c.get('peleador2', {}).get('nombre', '')
-                accion = st.session_state.visual_ufc.render(c, idx, st.session_state.tracker, None)
+                p1 = c.get('peleador1', '')
+                p2 = c.get('peleador2', '')
+                
+                # Crear partido para visual
+                partido_visual = {
+                    'peleador1': {'nombre': p1},
+                    'peleador2': {'nombre': p2}
+                }
+                
+                accion = st.session_state.visual_ufc.render(partido_visual, idx, st.session_state.tracker, None)
                 if accion == "analizar":
-                    with st.spinner("🥊 Analizando UFC..."):
-                        resultado = st.session_state.motores['ufc']({"peleador1": p1, "peleador2": p2})
-                        render_analisis_card(resultado)
-                        
-                        if st.session_state.gemini:
-                            gemini_resp = st.session_state.gemini.orquestrar_decision_final("UFC", c, resultado)
-                            st.markdown("### 🤖 GEMINI - DECISOR FINAL")
-                            st.info(gemini_resp)
+                    with st.spinner("🥊 Analizando UFC con Motor v20..."):
+                        try:
+                            if st.session_state.motores['ufc']:
+                                resultado = st.session_state.motores['ufc']({"peleador1": p1, "peleador2": p2})
+                                render_analisis_card(resultado)
+                                
+                                if st.session_state.gemini:
+                                    gemini_resp = st.session_state.gemini.orquestrar_decision_final("UFC", partido_visual, resultado)
+                                    st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                                    st.info(gemini_resp)
+                            else:
+                                st.error("Motor UFC no disponible")
+                        except Exception as e:
+                            st.error(f"Error en análisis UFC: {e}")
                 st.markdown("---")
         else:
             st.info("👈 Carga UFC en el sidebar")
 
-    with tab3:  # FÚTBOL
+    # ==================== TAB FÚTBOL ====================
+    with tab3:
         if st.session_state.futbol_partidos:
             for liga, partidos in st.session_state.futbol_partidos.items():
                 if partidos:
@@ -209,34 +348,67 @@ def main():
                     for idx, p in enumerate(partidos):
                         accion = st.session_state.visual_futbol.render(p, idx, liga, st.session_state.tracker, None, None, None, None)
                         if accion == "analizar":
-                            with st.spinner("⚽ Analizando Fútbol..."):
-                                resultado = st.session_state.motores['futbol'](p)
-                                render_analisis_card(resultado)
-                                
-                                if st.session_state.gemini:
-                                    gemini_resp = st.session_state.gemini.orquestrar_decision_final("FÚTBOL", p, resultado)
-                                    st.markdown("### 🤖 GEMINI - DECISOR FINAL")
-                                    st.info(gemini_resp)
+                            with st.spinner("⚽ Analizando Fútbol con Motor v20..."):
+                                try:
+                                    if st.session_state.motores['futbol']:
+                                        resultado = st.session_state.motores['futbol'](p)
+                                        render_analisis_card(resultado)
+                                        
+                                        if st.session_state.gemini:
+                                            gemini_resp = st.session_state.gemini.orquestrar_decision_final("FÚTBOL", p, resultado)
+                                            st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                                            st.info(gemini_resp)
+                                    else:
+                                        st.error("Motor Fútbol no disponible")
+                                except Exception as e:
+                                    st.error(f"Error en análisis Fútbol: {e}")
                         st.markdown("---")
         else:
             st.info("👈 Carga ligas en el sidebar")
 
-    with tab4:  # MLB
+    # ==================== TAB MLB ====================
+    with tab4:
         if st.session_state.mlb_partidos:
             for idx, p in enumerate(st.session_state.mlb_partidos):
                 accion = st.session_state.visual_mlb.render(p, idx, st.session_state.tracker, None, None, None)
                 if accion == "analizar":
-                    with st.spinner("⚾ Analizando MLB..."):
-                        resultado = st.session_state.motores['mlb'](p)
-                        render_analisis_card(resultado)
-                        
-                        if st.session_state.gemini:
-                            gemini_resp = st.session_state.gemini.orquestrar_decision_final("MLB", p, resultado)
-                            st.markdown("### 🤖 GEMINI - DECISOR FINAL")
-                            st.info(gemini_resp)
+                    with st.spinner("⚾ Analizando MLB con Motor v20..."):
+                        try:
+                            if st.session_state.motores['mlb']:
+                                resultado = st.session_state.motores['mlb'](p)
+                                render_analisis_card(resultado)
+                                
+                                if st.session_state.gemini:
+                                    gemini_resp = st.session_state.gemini.orquestrar_decision_final("MLB", p, resultado)
+                                    st.markdown("### 🤖 GEMINI - DECISOR FINAL")
+                                    st.info(gemini_resp)
+                            else:
+                                st.error("Motor MLB no disponible")
+                        except Exception as e:
+                            st.error(f"Error en análisis MLB: {e}")
                 st.markdown("---")
         else:
             st.info("👈 Carga MLB en el sidebar")
+
+    # ==================== PROFIT CARD ====================
+    try:
+        if os.path.exists("data/bitacora_maestra.csv"):
+            df = pd.read_csv("data/bitacora_maestra.csv")
+            if 'acierto' in df.columns:
+                ganadas = len(df[df['acierto'] == True])
+                perdidas = len(df[df['acierto'] == False])
+                if ganadas + perdidas > 0:
+                    profit = ((ganadas * 0.90) - perdidas) * 10
+                    color = "#00ff41" if profit >= 0 else "#ff4b4b"
+                    st.sidebar.markdown(f"""
+                    <div class="profit-card">
+                        <span>Profit Estimado</span>
+                        <h2 style='color: {color}; margin: 0;'>${profit:.2f} USD</h2>
+                        <span>{ganadas}W / {perdidas}L</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+    except Exception as e:
+        logger.error(f"Error en profit card: {e}")
 
 if __name__ == "__main__":
     main()
