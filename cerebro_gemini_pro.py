@@ -1,116 +1,136 @@
 ﻿# -*- coding: utf-8 -*-
 """
-CEREBRO GEMINI PRO - Versión FINAL y estable (marzo 2026)
-Compatible con tu test_gemini_simple.py
-Usa gemini-2.5-flash (el modelo que sí funciona)
+CEREBRO GEMINI PRO - Decisor Final Inteligente (Versión Optimizada para Betting AI NEON)
 """
 
 import os
 import logging
-
-try:
-    from google import genai
-    GENAI_AVAILABLE = True
-except ImportError:
-    GENAI_AVAILABLE = False
-    print("⚠️ Ejecuta: pip install google-genai --upgrade")
+import streamlit as st
+import google.generativeai as genai
+from typing import Dict, Any
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class CerebroGemini:
-    """Cliente Gemini 2026 - estable y simple"""
+class CerebroGeminiPro:
+    def __init__(self, api_key=None, modelo="gemini-2.5-flash"):
+        # Prioridad de API Key
+        if api_key:
+            self.api_key = api_key
+        elif hasattr(st, 'secrets') and 'GEMINI_API_KEY' in st.secrets:
+            self.api_key = st.secrets['GEMINI_API_KEY']
+        else:
+            self.api_key = os.environ.get("GEMINI_API_KEY")
 
-    def __init__(self, api_key=None, modelo=None):
-        self.api_key = api_key or os.environ.get("GEMINI_API_KEY")
-        self.model_name = modelo or "gemini-2.5-flash"   # Forzamos el modelo bueno por defecto
-        
         if not self.api_key:
-            logger.error("❌ No se encontró GEMINI_API_KEY en .env")
-            self.client = None
-            return
-
-        if not GENAI_AVAILABLE:
-            logger.error("❌ google-genai no instalado")
-            self.client = None
+            logger.warning("❌ No se encontró API key de Gemini")
+            self.model = None
             return
 
         try:
-            self.client = genai.Client(api_key=self.api_key)
-            logger.info(f"✅ Gemini inicializado con modelo: {self.model_name}")
-        except Exception as e:
-            logger.error(f"Error al crear cliente Gemini: {e}")
-            self.client = None
-
-    def _generar(self, prompt):
-        """Método interno para generar contenido"""
-        if not self.client:
-            return None, "Gemini no disponible"
-
-        try:
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt
+            genai.configure(api_key=self.api_key)
+            self.model = genai.GenerativeModel(
+                model_name=modelo,
+                generation_config={
+                    "temperature": 0.25,
+                    "top_p": 0.95,
+                    "top_k": 40,
+                    "max_output_tokens": 400,
+                }
             )
-            return response.text.strip(), None
+            logger.info(f"✅ Gemini Pro conectado correctamente con modelo: {modelo}")
         except Exception as e:
-            error_msg = str(e)
-            logger.warning(f"Error Gemini ({self.model_name}): {error_msg[:200]}...")
-            return None, error_msg
+            logger.error(f"Error al configurar Gemini: {e}")
+            self.model = None
 
-    def orquestrar_decision_final(self, deporte, partido, analisis_heuristico):
-        """Decisor final - Gemini elige la mejor apuesta"""
-        if not self.client:
-            return "❌ Gemini no disponible - usando análisis matemático"
+    def orquestrar_decision_final(self, deporte: str, partido: Dict, analisis_heuristico: Dict) -> str:
+        """Decisor final que combina motor matemático + razonamiento avanzado de Gemini"""
+        if not self.model:
+            return "❌ Gemini no disponible - confiando solo en análisis matemático"
 
-        local = partido.get('local', '')
-        visitante = partido.get('visitante', '')
-        rec = analisis_heuristico.get('recomendacion', 'N/A')
-        conf = analisis_heuristico.get('confianza', 0)
-        total = analisis_heuristico.get('total_proyectado', 0)
+        # Extraer datos del partido
+        if deporte.upper() == "UFC":
+            local = partido.get('peleador1', {}).get('nombre', 'Desconocido')
+            visitante = partido.get('peleador2', {}).get('nombre', 'Desconocido')
+        else:
+            local = partido.get('home', partido.get('local', 'Desconocido'))
+            visitante = partido.get('away', partido.get('visitante', 'Desconocido'))
+
+        # Datos clave del análisis matemático
+        recomendacion = analisis_heuristico.get('recomendacion', 'N/A')
+        confianza_math = analisis_heuristico.get('confianza', 0)
+        total_proyectado = analisis_heuristico.get('total_proyectado', 0)
+        edge = analisis_heuristico.get('edge', analisis_heuristico.get('ev_mejor', 0))
+        prob_math = analisis_heuristico.get('probabilidad', confianza_math)
 
         prompt = f"""
-Eres el decisor final de BETTING AI NEON.
-Deporte: {deporte.upper()}
-Partido: {local} vs {visitante}
+Eres un analista profesional de apuestas deportivas con más de 15 años de experiencia. Eres conservador y solo recomiendas cuando hay valor real.
 
-Análisis matemático: {rec} ({conf}% confianza) | Total proyectado: {total}
+**Deporte:** {deporte.upper()}
+**Partido:** {local} vs {visitante}
 
-Elige la MEJOR APUESTA FINAL según la jerarquía del usuario.
-Responde **exactamente** con este formato:
+**Análisis Matemático (Motor v20):**
+- Recomendación: {recomendacion}
+- Confianza matemática: {confianza_math}%
+- Probabilidad estimada: {prob_math}%
+- Total proyectado: {total_proyectado}
+- Edge calculado: {edge:.1f}%
 
-MEJOR APUESTA FINAL: [ej: Over 8.5 / Gana Pittsburgh Pirates / BTTS / Handicap]
-PROBABILIDAD: XX%
-RAZON: [explicación corta y clara en español]
+**Cuotas disponibles:** {partido.get('odds', 'No disponibles')}
+
+Tu tarea:
+1. Evalúa si el análisis matemático tiene sentido real.
+2. Considera factores cualitativos importantes (forma reciente, lesiones, motivación, historial H2H, descanso, etc.).
+3. Decide si apoyas la recomendación del motor o sugieres algo diferente.
+4. Sé honesto: si no hay valor claro, dilo.
+
+Responde **EXCLUSIVAMENTE** con este formato exacto (no agregues texto extra):
+
+MEJOR APUESTA FINAL: [OVER/UNDER/ML/SPREAD/BTTS/GANA LOCAL/GANA VISITANTE/NO RECOMENDAR]
+PROBABILIDAD ESTIMADA: XX%
+RAZÓN PRINCIPAL: [máximo una línea clara y concreta]
 RIESGO: [Bajo / Medio / Alto]
 CONFIANZA IA: [Alta / Media / Baja]
 """
 
-        resultado, error = self._generar(prompt)
-        return resultado if resultado else f"Error Gemini: {error}. Usa el pick matemático: {rec}"
+        try:
+            response = self.model.generate_content(prompt)
+            texto = response.text.strip()
 
-    def generar_proyeccion(self, prompt):
-        """Genera proyección cuando faltan datos históricos"""
-        if not self.client:
-            return "9.0"
-        resultado, _ = self._generar(prompt)
-        return resultado or "9.0"
+            # Fallback seguro si Gemini no sigue el formato
+            if "MEJOR APUESTA FINAL" not in texto or len(texto) < 30:
+                return f"""MEJOR APUESTA FINAL: {recomendacion}
+PROBABILIDAD ESTIMADA: {confianza_math}%
+RAZÓN PRINCIPAL: Análisis matemático sólido del motor v20
+RIESGO: Medio
+CONFIANZA IA: Media"""
 
-    # Métodos de compatibilidad (para no romper otros archivos)
-    def analizar_contexto_nba(self, local, visitante, stats, contexto=""):
-        prompt = f"Partido NBA: {local} vs {visitante}\nDatos: {stats}\n{contexto}"
-        resultado, _ = self._generar(prompt)
-        return resultado or "Error en Gemini"
+            return texto
 
-    def analizar_ufc(self, peleador1, peleador2, datos):
-        prompt = f"Combate UFC: {peleador1} vs {peleador2}\n{datos}"
-        resultado, _ = self._generar(prompt)
-        return resultado or "Error en Gemini"
+        except Exception as e:
+            logger.error(f"Error en Gemini: {e}")
+            return f"""MEJOR APUESTA FINAL: {recomendacion}
+PROBABILIDAD ESTIMADA: {confianza_math}%
+RAZÓN PRINCIPAL: Error de conexión con Gemini - confiando en motor matemático
+RIESGO: Medio
+CONFIANZA IA: Media"""
 
-    def analizar_futbol(self, local, visitante, stats_local, stats_visit):
-        prompt = f"Partido fútbol: {local} vs {visitante}\nLocal: {stats_local}\nVisitante: {stats_visit}"
-        resultado, _ = self._generar(prompt)
-        return resultado or "Error en Gemini"
+    def analizar_con_decision(self, partido, analisis_heuristico):
+        """Método de compatibilidad con tu código anterior"""
+        return self.orquestrar_decision_final("NBA", partido, analisis_heuristico)
+
+    def generar_proyeccion(self, prompt: str):
+        """Genera proyección cuando faltan datos"""
+        if not self.model:
+            return "Gemini no disponible"
+        try:
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+        except Exception as e:
+            logger.error(f"Error generando proyección: {e}")
+            return None
+
 
 def get_gemini(api_key=None):
-    return CerebroGemini(api_key)
+    """Helper para mantener compatibilidad"""
+    return CerebroGeminiPro(api_key)
