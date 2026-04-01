@@ -47,7 +47,7 @@ from render_unificado import render_analisis_card
 from motor_nba_pro_v17 import analizar_nba_pro_v17, backtest_nba_v17
 from motor_mlb_pro import analizar_mlb_pro, backtest_mlb_pro
 from motor_ufc_pro import analizar_ufc_pro, backtest_ufc_pro
-from motor_futbol_pro import analizar_futbol_pro, backtest_futbol_pro
+from motor_fut_pro import analizar_futbol_pro_v20, backtest_futbol_pro_v20
 
 # ==================== FUNCIONES AUXILIARES ====================
 def actualizar_odds_ufc():
