@@ -124,6 +124,13 @@ class ESPN_UFC:
                 'categoria': 'Peso Medio',
                 'evento': 'UFC Vegas 115',
                 'fecha': datetime.now().strftime("%Y-%m-%d")
+            },
+            {
+                'peleador1': {'nombre': 'Ricky Simon'},
+                'peleador2': {'nombre': 'Adrian Yanez'},
+                'categoria': 'Peso Gallo',
+                'evento': 'UFC Vegas 115',
+                'fecha': datetime.now().strftime("%Y-%m-%d")
             }
         ]
 
@@ -132,6 +139,17 @@ class ESPN_UFC:
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
+            
+            # Asegurar que la tabla existe
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS eventos_ufc (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    nombre TEXT,
+                    fecha TEXT,
+                    cartelera TEXT,
+                    ultima_actualizacion TEXT
+                )
+            ''')
             
             # Limpiar eventos viejos
             cursor.execute("DELETE FROM eventos_ufc")
