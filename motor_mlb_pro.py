@@ -1,80 +1,51 @@
 # -*- coding: utf-8 -*-
 """
-MOTOR MLB PRO - Análisis con Poisson + Monte Carlo
+MOTOR MLB PRO - Con datos de prueba
 """
 
 import numpy as np
-from scipy.stats import poisson
-import logging
-from database_manager import db
-
-logger = logging.getLogger(__name__)
 
 def analizar_mlb_pro_v20(partido_data):
-    """
-    Analiza partido MLB con Poisson + Monte Carlo
-    
-    Args:
-        partido_data: dict con local, visitante, odds
-    
-    Returns:
-        dict con recomendacion, confianza, etc.
-    """
-    local = partido_data.get('home', '')
-    visitante = partido_data.get('away', '')
+    """Analiza partido MLB con datos de prueba"""
+    local = partido_data.get('home', partido_data.get('local', 'Local'))
+    visitante = partido_data.get('away', partido_data.get('visitante', 'Visitante'))
     odds = partido_data.get('odds', {})
     linea_ou = odds.get('over_under', 8.5)
     
-    # Obtener últimos 5 partidos
-    stats_l = db.get_team_stats(local, deporte='mlb', limit=5)
-    stats_v = db.get_team_stats(visitante, deporte='mlb', limit=5)
+    # Datos de prueba
+    equipos_fuertes = ["Dodgers", "Yankees", "Braves", "Astros", "Phillies"]
+    equipos_debiles = ["Athletics", "Rockies", "Royals", "Pirates"]
     
-    if not stats_l or not stats_v:
-        logger.warning(f"Datos insuficientes para {local} vs {visitante}")
-        return {
-            'recomendacion': 'DATOS INSUFICIENTES',
-            'confianza': 40,
-            'total_proyectado': 8.5,
-            'etiqueta_verde': False
-        }
+    factor_local = 1.2 if local in equipos_fuertes else (0.8 if local in equipos_debiles else 1.0)
+    factor_visit = 1.2 if visitante in equipos_fuertes else (0.8 if visitante in equipos_debiles else 1.0)
     
-    # Proyección
-    ataque_l = stats_l.get('promedio_favor', 4.5)
-    defensa_v = stats_v.get('promedio_contra', 4.5)
-    ataque_v = stats_v.get('promedio_favor', 4.5)
-    defensa_l = stats_l.get('promedio_contra', 4.5)
+    base_local = 4.8
+    base_visit = 4.5
     
-    expected_local = (ataque_l * 0.55 + defensa_v * 0.45) * 1.02
-    expected_visit = (ataque_v * 0.55 + defensa_l * 0.45) * 1.02
+    expected_local = base_local * factor_local
+    expected_visit = base_visit * factor_visit
     total_proyectado = expected_local + expected_visit
     
-    # Simulación Monte Carlo
-    np.random.seed(42)
-    sim_local = poisson.rvs(expected_local, size=10000)
-    sim_visit = poisson.rvs(expected_visit, size=10000)
-    sim_total = sim_local + sim_visit
-    
-    prob_over = np.mean(sim_total > linea_ou)
-    prob_under = 1 - prob_over
+    prob_over = 1 / (1 + np.exp(-(total_proyectado - linea_ou) / 2))
     
     if prob_over > 0.55:
         recomendacion = f"OVER {linea_ou}"
-        confianza = int(prob_over * 100)
-    elif prob_under > 0.55:
+        confianza = int(60 + (prob_over - 0.55) * 100)
+    elif prob_over < 0.45:
         recomendacion = f"UNDER {linea_ou}"
-        confianza = int(prob_under * 100)
+        confianza = int(60 + (0.45 - prob_over) * 100)
     else:
         recomendacion = "SIN VALOR CLARO"
         confianza = 50
     
+    confianza = min(85, max(40, confianza))
+    
     return {
         'recomendacion': recomendacion,
         'confianza': confianza,
-        'probabilidad': round(max(prob_over, prob_under) * 100, 1),
+        'probabilidad': round(prob_over * 100, 1),
         'total_proyectado': round(total_proyectado, 1),
         'proyeccion_local': round(expected_local, 1),
         'proyeccion_visitante': round(expected_visit, 1),
-        'etiqueta_verde': confianza >= 70,
-        'stats_local': stats_l,
-        'stats_visitante': stats_v
+        'etiqueta_verde': confianza >= 70
     }
